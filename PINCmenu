@@ -1,0 +1,1353 @@
+#!/bin/ksh
+
+################################################################################
+##
+##  Nombre del Programa : SGCPINCmenu.sh
+##                Autor : SSM
+##       Codigo Inicial : 11/01/2008
+##          Descripcion : Menu del Proceso de Incoming
+##
+##  ======================== Registro de Modificaciones ========================
+##
+##  Fecha      Autor Version Descripcion de la Modificacion
+##  ---------- ----- ------- ---------------------------------------------------
+##  11/01/2008 SSM   1.00    Codigo Inicial
+##  25/03/2008 SSM   1.50    Mostrar codigo de ambiente
+##  26/05/2008 JMG   2.00    Cambio de Fecha Carga por Fecha Proceso
+##  30/06/2008 JMG   2.50    Reporte de Compensacion de Marcas
+##  18/07/2008 JMG   3.00    Division de archivo para Incoming y Retornos VISA
+##  11/02/2009 JMG   3.10    Nueva opcion para el Proceso de Cartas
+##  01/07/2011 JMG   3.20    Modificacion de Incoming Price LI
+##  17/06/2012 CRF   3.50    Adici�n de Men� de Cuadre Global
+##  06/03/2013 DCB   3.99    Modificacion para Incoming Automatico MasterCard
+##                           e incorporacion de Compensacion PLATCO
+##  01/06/2015 DQN   4.00    Inclusion de menu de Incoming de VISA y reestructuracion
+##							        de todas las opciones.
+##  03/02/2020 FVG   5.00    Inclusion de menu de Incoming de Naiguata IPR1302
+################################################################################
+
+################################################################################
+## DECLARACION DE DATOS, PARAMETROS DE EJECUCION Y VARIABLES DEL PROGRAMA
+################################################################################
+
+
+## Datos del Programa
+################################################################################
+
+dpNom="SGCPINCmenu"           # Nombre del Programa
+dpDesc=""                     # Descripcion del Programa
+dpVer=5.00                    # Ultima Version del Programa
+dpFec="20200203"              # Fecha de Ultima Actualizacion [Formato:AAAAMMDD]
+
+## Variables del Programa
+################################################################################
+
+vpValRet=""                   # Valor de Retorno (funciones)
+vpFH=`date '+%Y%m%d%H%M%S'`   # Fecha y Hora [Formato:AAAAMMDDHHMMSS]
+vpFileLOG=""                  # Nombre del Archivo LOG del Programa
+
+
+## Parametros
+################################################################################
+
+
+## Variables de Trabajo
+################################################################################
+
+vFecSes=""                    # Fecha de Sesion
+vFecProc=""                   # Fecha de Proceso
+
+################################################################################
+## DECLARACION DE FUNCIONES
+################################################################################
+
+
+# f_msg | muestra mensaje en pantalla
+# Parametros
+#   pMsg    : mensaje a mostrar
+#   pRegLOG : registra mensaje en el LOG del Proceso [S=Si(default)/N=No]
+################################################################################
+f_msg ()
+{
+pMsg="$1"
+pRegLOG="$2"
+if [ "${pMsg}" = "" ]; then
+   echo
+   if [ "${vpFileLOG}" != "" ]; then
+      echo >> ${vpFileLOG}
+   fi
+else
+   echo "${pMsg}"
+   if [ "${vpFileLOG}" != "" ]; then
+      if [ "${pRegLOG}" = "S" ] || [ "${pRegLOG}" = "" ]; then
+         echo "${pMsg}" >> ${vpFileLOG}
+      fi
+   fi
+fi
+}
+
+
+# f_fhmsg | muestra mensaje con la fecha y hora del sistema
+# Parametros
+#   pMsg    : mensaje a mostrar
+#   pFlgFH  : muestra fecha y hora [S=Si(default)/N=No]
+#   pRegLOG : registra mensaje en el LOG del Proceso [S=Si(default)/N=No]
+################################################################################
+f_fhmsg ()
+{
+pMsg="$1"
+pFlgFH="$2"
+pRegLOG="$3"
+if [ "$pMsg" = "" ]; then
+   f_msg
+else
+   if [ "$pFlgFH" = "S" ] || [ "$pFlgFH" = "" ]; then
+      pMsg="`date '+%H:%M:%S'` > ${pMsg}"
+   else
+      pMsg="         > ${pMsg}"
+   fi
+   f_msg "${pMsg}" ${pRegLOG}
+fi
+}
+
+
+# f_fechora | cambia el formato de la fecha y hora
+#             YYYYMMDD > DD/MM/YYYY
+#             HHMMSS > HH:MM:SS
+#             YYYYMMDDHHMMSS > DD/MM/YYYY HH:MM:SS
+# Parametros
+#   pFH : fecha/hora
+################################################################################
+f_fechora ()
+{
+pFH="$1"
+vLong=`echo ${pFH} | awk '{print length($0)}'`
+case ${vLong} in
+     8)  # Fecha
+         vDia=`echo $pFH | awk '{print substr($0,7,2)}'`
+         vMes=`echo $pFH | awk '{print substr($0,5,2)}'`
+         vAno=`echo $pFH | awk '{print substr($0,1,4)}'`
+         vpValRet="${vDia}/${vMes}/${vAno}";;
+     6)  # Hora
+         vHra=`echo $pFH | awk '{print substr($0,1,2)}'`
+         vMin=`echo $pFH | awk '{print substr($0,3,2)}'`
+         vSeg=`echo $pFH | awk '{print substr($0,5,2)}'`
+         vpValRet="${vHra}:${vMin}:${vSeg}";;
+     14) # Fecha y Hora
+         vDia=`echo $pFH | awk '{print substr($0,7,2)}'`
+         vMes=`echo $pFH | awk '{print substr($0,5,2)}'`
+         vAno=`echo $pFH | awk '{print substr($0,1,4)}'`
+         vHra=`echo $pFH | awk '{print substr($0,9,2)}'`
+         vMin=`echo $pFH | awk '{print substr($0,11,2)}'`
+         vSeg=`echo $pFH | awk '{print substr($0,13,2)}'`
+         vpValRet="${vDia}/${vMes}/${vAno} ${vHra}:${vMin}:${vSeg}";;
+esac
+}
+
+
+# f_menuCAB () | Encabezado Menu Principal
+################################################################################
+f_menuCAB ()
+{
+
+   clear
+   echo "*******************************************************************************"
+   echo "*                       SISTEMA DE GESTION DE COMERCIOS                  ${COD_AMBIENTE} *"
+   echo "*                   Menu Principal del Proceso de Incoming                    *"
+   echo "*******************************************************************************"
+
+}
+
+
+# f_menuDAT () | menu de informacion
+################################################################################
+f_menuDAT ()
+{
+
+   f_fechora ${vFecSes}
+   vFecSesF=${vpValRet}
+   f_fechora ${vFecProc}
+   vFecProcF=${vpValRet}
+   echo " Fecha de Sesion: ${vFecSesF}    Reproceso: ${vOpcRepro}     Fecha de Proceso: ${vFecProcF}"
+
+}
+
+
+# f_menuOPC () | menu de opciones
+################################################################################
+f_menuOPC ()
+{
+
+   echo "-------------------------------------------------------------------------------"
+   echo
+   echo "   PROCESOS                                 CONFIGURACION"
+   echo "  -------------------------------------    ----------------------------------"
+   echo "    [ 1]  Incoming de Price (LI)             [ 6]  Fecha de Sesion"
+   echo "    [ 2]  Confirmacion de Price (LE)         [ 7]  Fecha de Proceso"
+   echo "    [ 3]  Incoming de Visa"
+   echo "    [ 4]  Incoming de MasterCard            REPORTES"
+   echo "    [40]  Incoming de Naiguata             ----------------------------------"
+   echo "    [ 5]  Generacion de Cartas               [ 8]  Compensacion PLATCO"
+   echo "                                             [ 9]  Compensacion de las Marcas"
+   echo "                                             [10]  Cuadre Global"
+   echo "-------------------------------------------------------------------------------"
+   echo " Ver $dpVer | Telefonica Servicios Transaccionales                     [Q] Salir"
+   echo "-------------------------------------------------------------------------------"
+
+}
+# f_admCTL () | administra el Archivo de Control (lee/escribe)
+# Parametros
+#   pOpcion   : R=lee/W=escribe
+################################################################################
+f_admCTL ()
+{
+
+  # Estructura del Archivo de Control
+  # [01-02] Codigo de Entidad Adquirente
+  # [04-11] Fecha de Proceso
+  # [16-16] Estado del Proceso (P=Pendiente/X=En Ejecucion/E=Fin ERROR/F=Fin OK)
+  # [18-19] Codigo del Sub-Proceso
+  # [21-33] Fecha y Hora de Actualizacion de los Estados [AAAAMMDDHHMMSS]
+
+  pOpcion="$1"
+
+  if [ "$pOpcion" = "R" ]; then
+     if ! [ -f "$vFileCTL" ]; then
+        # Crea el Archivo CTL
+        vEstProc="P"
+        vSubProc="00"
+        echo "${pEntAdq}|${pFecProc}|${vEstProc}|${vSubProc}|`date '+%Y%m%d%H%M%S'`" > $vFileCTL
+     else
+        vEstProc=`awk '{print substr($0,16,1)}' $vFileCTL`
+     fi
+  else
+     echo "${pEntAdq}|${pFecProc}|${vEstProc}|${vSubProc}|`date '+%Y%m%d%H%M%S'`" > $vFileCTL
+  fi
+
+}
+
+
+################################################################################
+
+
+
+################################################################################
+## INICIO | PROCEDIMIENTO PRINCIPAL
+################################################################################
+
+echo
+
+## Fecha de Sesion
+################################################################################
+
+vFecSes=`getdate -1`
+vFecProc=`getdate`
+vOpcRepro="N"
+
+while ( test -z "$vOpcion" || true ) do
+
+
+   f_menuCAB
+   f_menuDAT
+   f_menuOPC
+
+   if [ "${vOpcion}" = "" ]; then
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcion
+      if [ "$vOpcion" = "q" ] || [ "$vOpcion" = "Q" ]; then
+         echo
+         exit 0
+      fi
+   fi
+
+   vFlgOpcErr="S"
+
+   if [ "$vOpcion" = "" ]; then
+      # Vuelve a mostrar el menu
+      vFlgOpcErr="N"
+   fi
+
+
+   # INCOMING DE PRICE
+
+   if [ "$vOpcion" = "1" ]; then
+
+      vFlgOpcErr="S"
+
+      echo
+      echo " INCOMING DE PRICE (LI) | Seleccione el Adquirente:"
+      echo
+      echo "   [ 1] Banco Mercantil"
+      echo "   [ 2] Banco Provincial"
+      echo "   [ Q] Cancelar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcADQ
+
+      if [ "$vOpcADQ" = "q" ] || [ "$vOpcADQ" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "" ]; then
+         vOpcion="1"
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "1" ] || [ "$vOpcADQ" = "2" ]; then
+
+         if [ "$vOpcADQ" = "1" ]; then
+            vEntAdq="BM"
+            vNombAdquirente="BANCO MERCANTIL"
+         else
+            vEntAdq="BP"
+            vNombAdquirente="BANCO PROVINCIAL"
+         fi
+
+         vFlgOpcErr="N"
+         vOpcion=""
+         # Confirmacion de Ejecucion
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg "         Proceso: INCOMING DE PRICE - LI" N S
+         f_msg "      Adquirente: ${vNombAdquirente}" N S
+         f_fechora $vFecSes
+         f_msg " Fecha de Sesion: $vpValRet" N S
+         f_msg
+         echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+         read ValConf
+         f_msg
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+            SGDINCPRICELI.sh ${vEntAdq} ${vFecSes}
+            echo " --> presione [ENTER] para continuar."
+            read vContinua
+         fi
+      fi
+
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="1"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+   fi # Opcion 1 - Incoming de PRICE
+
+
+   # CONFIRMACION DE PRICE
+
+   if [ "$vOpcion" = "2" ]; then
+
+      vFlgOpcErr="S"
+
+      echo
+      echo " CONFIRMACION DE PRICE (LE) | Seleccione el Adquirente:"
+      echo
+      echo "   [ 1] Banco Mercantil"
+      echo "   [ 2] Banco Provincial"
+      echo "   [ Q] Cancelar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcADQ
+
+      if [ "$vOpcADQ" = "q" ] || [ "$vOpcADQ" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "" ]; then
+         vOpcion="2"
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "1" ]; then  # Confirmacion PRICE - MERCANTIL
+         vFlgOpcErr="N"
+         vOpcion=""
+         # Confirmacion de Ejecucion
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg "         Proceso: CONFIRMACION DE PRICE" N S
+         f_msg "      Adquirente: BANCO MERCANTIL" N S
+         f_fechora $vFecSes
+         f_msg " Fecha de Sesion: $vpValRet" N S
+         f_msg
+         echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+         read ValConf
+         f_msg
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            vFileLOG="${DIRLOG}/SGCPINC.CONFPRICE${pEntAdq}${vFecSes}.`date '+%Y%m%d%H%M%S'`.LOG"
+            if [ -f "$vFileLOG" ]; then
+               rm -f $vFileLOG
+            fi
+            touch $vFileLOG
+            echo
+            echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+            echo "                 Directorio : `dirname ${vFileLOG}`"
+            nohup SGD_Carga_Manual_PD_LE.sh BM ${vFecSes} S 1>${vFileLOG} 2>&1 &
+            trap "trap '' 2" 2
+            tail -f $vFileLOG
+            trap ""
+            echo
+         fi
+      fi # Confirmacion PRICE - MERCANTIL
+
+      if [ "$vOpcADQ" = "2" ]; then  # Confirmacion PRICE - PROVINCIAL
+         vFlgOpcErr="N"
+         vOpcion=""
+         # Confirmacion de Ejecucion
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg "         Proceso: CONFIRMACION DE PRICE" N S
+         f_msg "      Adquirente: BANCO PROVINCIAL" N S
+         f_fechora $vFecSes
+         f_msg " Fecha de Sesion: $vpValRet" N S
+         f_msg
+         echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+         read ValConf
+         f_msg
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            vFileLOG="${DIRLOG}/SGCPINC.CONFPRICE${pEntAdq}${vFecSes}.`date '+%Y%m%d%H%M%S'`.LOG"
+            if [ -f "$vFileLOG" ]; then
+               rm -f $vFileLOG
+            fi
+            touch $vFileLOG
+            echo
+            echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+            echo "                 Directorio : `dirname ${vFileLOG}`"
+            nohup SGD_Carga_Manual_PD_LE.sh BP ${vFecSes} S 1>${vFileLOG} 2>&1 &
+            trap "trap '' 2" 2
+            tail -f $vFileLOG
+            trap ""
+            echo
+         fi
+      fi # Confirmacion PRICE - PROVINCIAL
+
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="2"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+   fi # Opcion 2 - Confirmacion de PRICE
+
+
+   # INCOMING DE VISA
+
+   if [ "$vOpcion" = "3" ]; then
+
+         vFlgOpcErr="N"
+         vOpcion=""
+         trap "trap '' 2" 2
+         SGCPINCVIADQmenu.sh TODOS ${vFecProc} ${pFecSes} #Homologando produccion pFecSes IPR1302 27/02/2020
+         trap ""   
+   fi # Opcion 3 - Incoming de VISA
+
+
+   # INCOMING DE MASTERCARD
+
+   if [ "$vOpcion" = "4" ]; then
+      vFlgOpcErr="S"
+
+      echo
+      echo " INCOMING DE MASTERCARD | Seleccione el Adquirente:"
+      echo
+      echo "   [1] Todos"
+      echo
+      echo
+      echo
+      echo " Eventual"
+      echo "-------------------------------------------------"
+      echo "   [0105] Banco Mercantil"
+      echo "   [0108] Banco Provincial"
+      echo "   [Q] Cancelar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcADQ
+
+      if [ "$vOpcADQ" = "q" ] || [ "$vOpcADQ" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "" ]; then
+         vOpcion="6"
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "1" ]; then  # Incoming MC - TODOS
+         vFlgOpcErr="N"
+         vOpcion=""
+         trap "trap '' 2" 2
+         SGCPINCMCADQmenu.sh TODOS ${vFecProc}
+         trap ""
+      fi # Incoming MC - TODOS
+
+      if [ "$vOpcADQ" = "0105" ]; then  # Incoming MC - MERCANTIL
+         vFlgOpcErr="N"
+         vOpcion=""
+         trap "trap '' 2" 2
+         SGCPINCMCADQmenu.sh BM ${vFecProc}
+         trap ""
+      fi # Incoming MC - MERCANTIL
+
+      if [ "$vOpcADQ" = "0108" ]; then  # Incoming MC - PROVINCIAL
+         vFlgOpcErr="N"
+         vOpcion=""
+         trap "trap '' 2" 2
+         SGCPINCMCADQmenu.sh BP ${vFecProc}
+         trap ""
+      fi # Incoming MC - PROVINCIAL
+
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="6"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+
+   fi # Opcion 4 - Incoming de MasterCard
+
+################################################################################
+## Menu Incoming de Naiguata  (MASTER CARD Y VISA) | FJVG IPR 1302 
+################################################################################
+
+   if [ "$vOpcion" = "40" ]; then
+      vFlgOpcErr="S"
+
+      echo
+      echo " ##################################################"
+      echo "    MENU  | INCOMING NAIGUATA Seleccione MARCA     "
+      echo " ##################################################"
+      echo 
+      echo "   PROCESOS                                        "
+      echo "  -------------------------------------            "
+      echo "    [10]  Incoming de Visa NAIGUATA"
+      echo "    [20]  Incoming de MasterCard NAIGUATA   "
+      echo
+      echo
+      echo "   [Q] Cancelar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcADQ
+
+      if [ "$vOpcADQ" = "q" ] || [ "$vOpcADQ" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "" ]; then
+         vOpcion="6"
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "10" ]; then  # Incoming de Visa NAIGUATA
+         clear   #limpia la pantalla para visualizarmejor el menu ip1302 fjvg
+         vFlgOpcErr="N"
+         vOpcion=""
+         
+         echo "    [10]  Incoming de Visa NAIGUATA <<<EN CONTRUCCION>>>"
+
+
+      fi # Incoming de Visa NAIGUATA
+
+      if [ "$vOpcADQ" = "20" ]; then  # Incoming de MasterCard  NAIGUATA
+         clear   #limpia la pantalla para visualizarmejor el menu ip1302 fjvg
+         vFlgOpcErr="N"
+         vOpcion=""
+         ############################################################
+         # INCOMING DE MASTERCARD
+
+            echo
+            echo " INCOMING DE MASTERCARD NAIGUATA | Seleccione el Adquirente:"
+            echo
+            echo "   [21] Todos"
+            echo
+            echo
+            echo
+            echo " Eventual"
+            echo "-------------------------------------------------"
+            echo "   [105] Banco Mercantil"
+            echo "   [108] Banco Provincial"
+            echo "   [Q] Cancelar"
+            echo
+            echo "   Seleccione Opcion => \c"
+            read vOpcADQ
+
+            if [ "$vOpcADQ" = "q" ] || [ "$vOpcADQ" = "Q" ]; then
+               vOpcion=""
+               vFlgOpcErr="N"
+            fi
+
+            if [ "$vOpcADQ" = "" ]; then
+               vOpcion="6"
+               vFlgOpcErr="N"
+            fi
+
+            if [ "$vOpcADQ" = "21" ]; then  # Incoming MC - TODOS
+               vFlgOpcErr="N"
+               vOpcion=""
+               trap "trap '' 2" 2
+               SGCPINCMCADQmenu_ngta.sh TODOS ${vFecProc}
+               trap ""
+            fi # Incoming MC - TODOS
+
+            if [ "$vOpcADQ" = "105" ]; then  # Incoming MC - MERCANTIL
+               vFlgOpcErr="N"
+               vOpcion=""
+               trap "trap '' 2" 2
+               SGCPINCMCADQmenu_ngta.sh BM ${vFecProc}
+               trap ""
+            fi # Incoming MC - MERCANTIL
+
+            if [ "$vOpcADQ" = "108" ]; then  # Incoming MC - PROVINCIAL
+               vFlgOpcErr="N"
+               vOpcion=""
+               trap "trap '' 2" 2
+               SGCPINCMCADQmenu_ngta.sh BP ${vFecProc}
+               trap ""
+            fi # Incoming MC - PROVINCIAL
+
+            if [ "$vFlgOpcErr" = "S" ]; then
+               vOpcion="6"
+               echo
+               f_msg "${dpNom} - Opcion Incorrecta."
+               echo
+               echo "... presione [ENTER] para continuar."
+               read vContinua
+            fi
+
+            vFlgOpcErr="N"
+
+         ############################################################
+
+      fi # Incoming de MasterCard  NAIGUATA
+
+     
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="6"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+
+   fi # Opcion 4 - Incoming de MasterCard
+
+   # GENERACION DE CARTAS
+
+   if [ "$vOpcion" = "5" ]; then
+
+      vFlgOpcErr="S"
+
+      echo
+      echo " ARCHIVO DE CARTAS | Seleccione el Adquirente:"
+      echo
+      echo "   [ 1] Banco Mercantil"
+      echo "   [ 2] Banco Provincial"
+      echo "   [ Q] Cancelar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcADQ
+
+      if [ "$vOpcADQ" = "q" ] || [ "$vOpcADQ" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "" ]; then
+         vOpcion="7"
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "1" ] || [ "$vOpcADQ" = "2" ]; then
+
+         if [ "$vOpcADQ" = "1" ]; then
+            vEntAdq="BM"
+            vNombAdquirente="BANCO MERCANTIL"
+         else
+            vEntAdq="BP"
+            vNombAdquirente="BANCO PROVINCIAL"
+         fi
+
+         vFlgOpcErr="N"
+         vOpcion=""
+         # Confirmacion de Ejecucion
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg "         Proceso: GENERACION DE ARCHIVO DE CARTAS" N S
+         f_msg "      Adquirente: ${vNombAdquirente}" N S
+         f_fechora $vFecSes
+         f_msg " Fecha de Sesion: $vpValRet" N S
+         f_msg
+         echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+         read ValConf
+         f_msg
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+            SGCPCARTA.sh ${vEntAdq} ${vFecSes}
+            echo " --> presione [ENTER] para continuar."
+            read vContinua
+         fi
+      fi
+
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="7"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+   fi  # Opcion 7 - Opcion de Archivo de Cartas
+
+
+   # FECHA DE SESION
+
+   if [ "$vOpcion" = "6" ]; then
+
+      vFlgOpcErr="N"
+      vOpcion=""
+
+      echo
+      echo " Fecha de Sesion (Formato: AAAAMMDD,[Enter]=SYSDATE-1) => \c"
+      read vModFecSes
+
+      if [ "$vModFecSes" = "" ]; then
+         vFecSes=`getdate -1`
+      else
+         ValFecha.sh $vModFecSes
+         vRet=$?
+         if [ "$vRet" = "0" ]; then
+            # Confirmacion si la fecha de sesion es igual o mayor a la actual
+            vFecSys="`getdate`"
+            vFlgModFec="S"
+            if [ "$vModFecSes" -ge "$vFecSys" ]; then
+               vFlgModFec="N"
+               echo
+               echo "--------------------------------------------------------------------------------"
+               echo " CONFIRMACION DE CAMBIO DE FECHA DE SESION"
+               echo "--------------------------------------------------------------------------------"
+               echo
+               echo " La Fecha de Sesion ingresada es igual o mayor a la fecha actual."
+               echo
+               echo " Desea Continuar? (S=Si/N=No/[Enter]=No) => \c"
+               read vConf
+               if [ "$vConf" = "S" ] || [ "$vConf" = "s" ]; then
+                  vFlgModFec="S"
+               fi
+            fi
+            if [ "$vFlgModFec" = "S" ]; then
+               vFecSes=$vModFecSes
+            fi
+         else
+            echo
+            f_fhmsg "La Fecha de Sesion Ingresada es Incorrecta."
+            echo
+            echo "... presione [ENTER] para continuar."
+            read vContinua
+         fi
+      fi
+
+   fi  # Opcion 6 - Fecha de Sesion
+
+
+   # FECHA DE PROCESO
+
+   if [ "$vOpcion" = "7" ]; then
+
+      vFlgOpcErr="N"
+      vOpcion=""
+
+      echo
+      echo " Fecha de Proceso (Formato: AAAAMMDD,[Enter]=SYSDATE) => \c"
+      read vModFecProc
+
+      if [ "$vModFecProc" = "" ]; then
+         vFecProc=`getdate`
+      else
+         ValFecha.sh $vModFecProc
+         vRet=$?
+         if [ "$vRet" = "0" ]; then
+            # Confirmacion si la fecha de Proceso es igual o mayor a la actual
+            vFecSys="`getdate`"
+            vFlgModFec="S"
+            if [ "$vModFecProc" -gt "$vFecSys" ]; then
+               vFlgModFec="N"
+               echo
+               echo "--------------------------------------------------------------------------------"
+               echo " CONFIRMACION DE CAMBIO DE FECHA DE PROCESO"
+               echo "--------------------------------------------------------------------------------"
+               echo
+               echo " La Fecha de Proceso ingresada es mayor a la fecha actual."
+               echo
+               echo " Desea Continuar? (S=Si/N=No/[Enter]=No) => \c"
+               read vConf
+               if [ "$vConf" = "S" ] || [ "$vConf" = "s" ]; then
+                  vFlgModFec="S"
+               fi
+            fi
+            if [ "$vFlgModFec" = "S" ]; then
+               vFecProc=$vModFecProc
+            fi
+         else
+            echo
+            f_fhmsg "La Fecha de Proceso Ingresada es Incorrecta."
+            echo
+            echo "... presione [ENTER] para continuar."
+            read vContinua
+         fi
+      fi
+
+   fi  # Opcion 7 - Fecha de Proceso
+
+
+
+   # REPORTE COMPENSACION DE LAS MARCAS
+
+   if [ "$vOpcion" = "9" ]; then
+
+      vFlgOpcErr="S"
+
+      echo
+      echo " REPORTE COMPENSACION DE LAS MARCAS | Seleccione el Adquirente:"
+      echo
+      echo "   [ 1] Banco Mercantil"
+      echo "   [ 2] Banco Provincial"
+      echo "   [ Q] Cancelar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcADQ
+
+      if [ "$vOpcADQ" = "q" ] || [ "$vOpcADQ" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "" ]; then
+         vOpcion="11"
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "1" ]; then  # REPORTE COMPENSACION DE LAS MARCAS - MERCANTIL
+         vFlgOpcErr="N"
+         vOpcion=""
+         # Confirmacion de Ejecucion
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg "         Proceso: REPORTE COMPENSACION DE LAS MARCAS" N S
+         f_msg "      Adquirente: BANCO MERCANTIL" N S
+         f_fechora $vFecSes
+         f_msg " Fecha de Sesion: $vpValRet" N S
+         f_msg
+         echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+         read ValConf
+         f_msg
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            vFileLOG="${DIRLOG}/SGCPINC.REPORTCOMP${pEntAdq}${vFecSes}.`date '+%Y%m%d%H%M%S'`.LOG"
+            if [ -f "$vFileLOG" ]; then
+               rm -f $vFileLOG
+            fi
+            touch $vFileLOG
+            echo
+            echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+            echo "                 Directorio : `dirname ${vFileLOG}`"
+            nohup SGC_Reporte_Comp_Marcas.sh BM ${vFecSes} S 1>${vFileLOG} 2>&1 &
+            trap "trap '' 2" 2
+            tail -f $vFileLOG
+            trap ""
+            echo
+         fi
+      fi # Banco Mercantil
+
+      if [ "$vOpcADQ" = "2" ]; then  # Rechazos VISA - PROVINCIAL
+         vFlgOpcErr="N"
+         vOpcion=""
+         # Confirmacion de Ejecucion
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg "         Proceso: REPORTE COMPENSACION DE LAS MARCAS" N S
+         f_msg "      Adquirente: BANCO PROVINCIAL" N S
+         f_fechora $vFecSes
+         f_msg " Fecha de Sesion: $vpValRet" N S
+         f_msg
+         echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+         read ValConf
+         f_msg
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            vFileLOG="${DIRLOG}/SGCPINC.REPORTCOMP${pEntAdq}${vFecSes}.`date '+%Y%m%d%H%M%S'`.LOG"
+            if [ -f "$vFileLOG" ]; then
+               rm -f $vFileLOG
+            fi
+            touch $vFileLOG
+            echo
+            echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+            echo "                 Directorio : `dirname ${vFileLOG}`"
+            nohup SGC_Reporte_Comp_Marcas.sh BP ${vFecSes} S 1>${vFileLOG} 2>&1 &
+            trap "trap '' 2" 2
+            tail -f $vFileLOG
+            trap ""
+            echo
+         fi
+      fi # Banco Provincial
+
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="11"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+   fi # Opcion 9 - REPORTE COMPENSACION DE LAS MARCAS
+
+   if [ "$vOpcion" = "10" ]; then # Opcion 10 - Cuadre Global.....
+
+         vFlgOpcErr="N"
+         vOpcion=""
+         # Confirmacion de Ejecucion
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg "         Proceso: REPORTE CUADRE GLOBAL " N S
+         f_fechora $vFecSes
+         f_msg " Fecha de Sesion: $vpValRet" N S
+         f_msg
+         echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+         read ValConf
+         f_msg
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            vFileLOG="${DIRLOG}/SGCPINC.REPORTCUADREG${pEntAdq}${vFecSes}.`date '+%Y%m%d%H%M%S'`.LOG"
+            if [ -f "$vFileLOG" ]; then
+               rm -f $vFileLOG
+            fi
+            touch $vFileLOG
+            echo
+            echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+            echo "                 Directorio : `dirname ${vFileLOG}`"
+            nohup SGCRptGlobal.sh ${vFecSes} 1 1>${vFileLOG} 2>&1 &
+            trap "trap '' 2" 2
+            tail -f $vFileLOG
+            trap ""
+            echo
+         fi
+
+   fi # Opcion 10 - Cuadre Global.....
+
+   # REPORTE COMPENSACION PLATCO
+ 
+   if [ "$vOpcion" = "8" ]; then
+
+      vFlgOpcErr="S"
+
+FechaREP=`sqlplus -s $DB << !
+set head off
+set pagesize 0000
+select to_char(to_date('$vFecSes','YYYYMMDD'),'DD-MON-YYYY') from dual;
+!`
+      echo
+      echo " REPORTE COMPENSACION PLATCO | Seleccione el Adquirente:"
+      echo
+      echo "   [ 1] Banco Mercantil"
+      echo "   [ 2] Banco Provincial"
+      echo "   [ 3] Ver LOG Banco Mercantil"
+      echo "   [ 4] Ver LOG Banco Provincial"
+      echo "   [ Q] Cancelar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcADQ
+
+      if [ "$vOpcADQ" = "q" ] || [ "$vOpcADQ" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "" ]; then
+         vOpcion="10"
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcADQ" = "1" ]; then  # REPORTE COMPENSACION PLATCO - MERCANTIL
+         ERRCHKL=0
+         LI=""
+         LE=""
+         if [ -s ${DIRDAT}/SGCINCPRICELIBM${vFecSes}.CTL ]
+         then
+            LI=`awk '{print substr($0,10,1)}' ${DIRDAT}/SGCINCPRICELIBM${vFecSes}.CTL`
+         else
+            LI=N
+         fi
+         if [ -s ${DIRDAT}/SGCINCPRICELEBM${vFecSes}.CTL ]
+         then
+            LE=`awk '{print substr($0,10,1)}' ${DIRDAT}/SGCINCPRICELEBM${vFecSes}.CTL`
+         else
+            LE=N
+         fi
+         if [ "$LI" != "F" ] || [ "$LE" !=  "F" ]
+         then
+              ERRCHKL=0
+              EJECUOPC11="N"
+	      if [ "$LI" != "F" ]
+              then
+                 tput setf 8
+                 echo "\nEl Incoming de Price (LI) de la Fecha $FechaREP no finalizo Correctamente"
+                 tput setf 7
+                 echo " Desea Continuar? (S=Si/N=No/<Enter>=No) => \c"
+                 read RetConf
+                 if [ "$RetConf" = "S" ] || [ "$RetConf" = "s" ]
+                 then
+                    ERRCHKL=0
+                    EJECUOPC11="S"
+                    sqlplus -s $DB @$DIRBIN/alertacie INC PRICE	 "Incoming_PRICE(LI)_Fecha_$FechaRep_Adquiriente_BM_no_ejecutado__Operador_Continuo_Proceso"
+                 else
+                    ERRCHKL=1
+                    RAZONOPC11="El Incoming de Price (LI) de la Fecha $FechaREP no finalizo Correctamente"
+                    EJECUOPC11="N"
+                    sqlplus -s $DB @$DIRBIN/alertacie INC PRICE	 "Incoming_PRICE(LI)_Fecha_$FechaRep_Adquiriente_BM_no_ejecutado__Operador_Aborto_Proceso"
+                 fi
+              fi
+	      if [ "$LE" != "F" ] && [ "$ERRCHKL" = "0" ]
+              then
+                 tput setf 8
+                 echo "\nLa Confirmacion de Price (LE) de la Fecha $FechaREP no finalizo Correctamente"
+                 tput setf 7
+                 echo " Desea Continuar? (S=Si/N=No/<Enter>=No) => \c"
+                 read RetConf
+                 if [ "$RetConf" = "S" ] || [ "$RetConf" = "s" ]
+                 then
+                    EJECUOPC11="S"
+                    sqlplus -s $DB @$DIRBIN/alertacie INC PRICE	 "Confirmacion_PRICE(LE)_Fecha_$FechaRep_Adquiriente_BM_no_ejecutado__Operador_Continuo_Proceso"
+                 else
+                    EJECUOPC11="N"
+                    RAZONOPC11="La Confirmacion de Price (LE) de la Fecha $FechaREP no finalizo Correctamente"
+                    sqlplus -s $DB @$DIRBIN/alertacie INC PRICE	 "Confirmacion_PRICE(LE)_Fecha_$FechaRep_Adquiriente_BM_no_ejecutado__Operador_Aborto_Proceso"
+                 fi
+              fi
+         else
+              EJECUOPC11="S"
+         fi
+         vFlgOpcErr="N"
+         vOpcion=""
+         if [ "$vOpcRepro" = "S" ] && [ "$EJECUOPC11" = "S" ]; then
+            f_msg
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg " CONFIRMACION DE REPROCESO" N S
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            f_msg " El REPROCESO puede involucrar la ejecucion de acciones adicionales para" N S
+            f_msg " realizar correctamente la REVERSION de la ejecucion anterior, por lo que" N S
+            f_msg " puede ser NECESARIA una AUTORIZACION por parte del ADMINISTRADOR DEL SISTEMA." N S
+         elif [ "$EJECUOPC11" = "S" ]; then
+            # Confirmacion de Ejecucion
+            f_msg
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+            f_msg "--------------------------------------------------------------------------------" N S
+         fi
+         if [ "$EJECUOPC11" = "S" ]; then
+            f_msg
+            f_msg "         Proceso: REPORTE COMPENSACION PLATCO" N S
+            f_msg "      Adquirente: BANCO MERCANTIL" N S
+            f_fechora $vFecSes
+            f_msg " Fecha de Sesion: $vpValRet" N S
+            f_msg
+            echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+            read ValConf
+            f_msg
+         fi
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ] && [ "$EJECUOPC11" = "S" ]; then
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            vFileLOG="${DIRLOG}/repcompBM$FechaREP.log"
+            vFileLOGERR="${DIRLOG}/repcompBM$FechaREP.err"
+            pEntAdq="BM"
+            pFecProc=$FechaREP
+            vFileCTL="${DIRDAT}/REPCOMP${pEntAdq}.${pFecProc}.CTL"
+            f_admCTL R
+            if [ "$vEstProc" = "F" ] && [ "$vOpcRepro" != "S" ]
+            then
+               tput setf 8
+               echo "el Reporte de Compensacion PLATCO para este dia ya ha sido procesado"
+               tput setf 7
+               echo
+               echo "... presione [ENTER] para continuar."
+               read vContinua
+            else
+               if [ -f "$vFileLOG" ]; then
+                  rm -f $vFileLOG
+               fi
+               touch $vFileLOG
+               echo
+               echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+               echo "   Archivo LOG de Errores   : `basename ${vFileLOGERR}`"
+               echo "                 Directorio : `dirname ${vFileLOG}`"
+               $DIRBIN/SGCREPCOMP.sh BM 1 $FechaREP
+               grep 'Error' $vFileLOG > /dev/null 2>&1
+               ERRSTATUS=$?
+               vSubProc="00"
+               if [ "$ERRSTATUS" = "0" ]
+               then
+                  vEstProc="E"
+               else
+                  vEstProc="F"
+               fi
+               f_admCTL W
+               echo "Log de Ejecucion (oprima q para salir)"
+               pg $vFileLOG
+#              echo "Log de Errores (oprima q para salir)"
+#              pg $vFileLOGERR
+               echo
+            fi
+#         else
+#            if [ "$EJECUOPC11" != "S" ]
+#            then
+#               echo $RAZONOPC11
+#               echo "... presione [ENTER] para continuar."
+#               read vContinua
+#            fi
+         fi
+      fi # Banco Mercantil
+
+      if [ "$vOpcADQ" = "2" ]; then  # Reporte de Compensacion PLATCO - PROVINCIAL
+         ERRCHKL=0
+         LI=""
+         LE=""
+         if [ -s ${DIRDAT}/SGCINCPRICELIBP${vFecSes}.CTL ]
+         then
+            LI=`awk '{print substr($0,10,1)}' ${DIRDAT}/SGCINCPRICELIBP${vFecSes}.CTL`
+         else
+            LI=N
+         fi
+         if [ -s ${DIRDAT}/SGCINCPRICELEBP${vFecSes}.CTL ]
+         then
+            LE=`awk '{print substr($0,10,1)}' ${DIRDAT}/SGCINCPRICELEBP${vFecSes}.CTL`
+         else
+            LE=N
+         fi
+         if [ "$LI" != "F" ] || [ "$LE" !=  "F" ]
+         then
+              ERRCHKL=0
+              EJECUOPC11="N"
+	      if [ "$LI" != "F" ]
+              then
+                 tput setf 8
+                 echo "\nEl Incoming de Price (LI) de la Fecha $FechaREP no finalizo Correctamente"
+                 tput setf 7
+                 echo " Desea Continuar? (S=Si/N=No/<Enter>=No) => \c"
+                 read RetConf
+                 if [ "$RetConf" = "S" ] || [ "$RetConf" = "s" ]
+                 then
+                    ERRCHKL=0
+                    EJECUOPC11="S"
+                    sqlplus -s $DB @$DIRBIN/alertacie INC PRICE	 "Incoming_PRICE(LI)_Fecha_$FechaRep_Adquiriente_BP_no_ejecutado__Operador_Continuo_Proceso"
+                 else
+                    ERRCHKL=1
+                    RAZONOPC11="El Incoming de Price (LI) de la Fecha $FechaREP no finalizo Correctamente"
+                    sqlplus -s $DB @$DIRBIN/alertacie INC PRICE	 "Incoming_PRICE(LI)_Fecha_$FechaRep_Adquiriente_BP_no_ejecutado__Operador_Aborto_Proceso"
+                 fi
+              fi
+	      if [ "$LE" != "F" ] && [ "$ERRCHKL" = "0" ]
+              then
+                 tput setf 8
+                 echo "\nLa Confirmacion de Price (LE) de la Fecha $FechaREP no finalizo Correctamente"
+                 tput setf 7
+                 echo " Desea Continuar? (S=Si/N=No/<Enter>=No) => \c"
+                 read RetConf
+                 if [ "$RetConf" = "S" ] || [ "$RetConf" = "s" ]
+                 then
+                    EJECUOPC11="S"
+                    sqlplus -s $DB @$DIRBIN/alertacie INC PRICE	 "Confirmacion_PRICE(LE)_Fecha_$FechaRep_Adquiriente_BP_no_ejecutado__Operador_Continuo_Proceso"
+                 else
+                    EJECUOPC11="N"
+                    RAZONOPC11="La Confirmacion de Price (LE) de la Fecha $FechaREP no finalizo Correctamente"
+                    sqlplus -s $DB @$DIRBIN/alertacie INC PRICE	 "Confirmacion_PRICE(LE)_Fecha_$FechaRep_Adquiriente_BP_no_ejecutado__Operador_Aborto_Proceso"
+                 fi
+              fi
+         else
+              EJECUOPC11="S"
+         fi
+         vFlgOpcErr="N"
+         vOpcion=""
+         if [ "$vOpcRepro" = "S" ] && [ "$EJECUOPC11" = "S" ]; then
+            f_msg
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg " CONFIRMACION DE REPROCESO" N S
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            f_msg " El REPROCESO puede involucrar la ejecucion de acciones adicionales para" N S
+            f_msg " realizar correctamente la REVERSION de la ejecucion anterior, por lo que" N S
+            f_msg " puede ser NECESARIA una AUTORIZACION por parte del ADMINISTRADOR DEL SISTEMA." N S
+         elif [ "$EJECUOPC11" = "S" ]; then
+         # Confirmacion de Ejecucion
+            f_msg
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+            f_msg "--------------------------------------------------------------------------------" N S
+         fi
+         if [ "$EJECUOPC11" = "S" ]; then
+            f_msg
+            f_msg "         Proceso: REPORTE COMPENSACION PLATCO" N S
+            f_msg "      Adquirente: BANCO PROVINCIAL" N S
+            f_fechora $vFecSes
+            f_msg " Fecha de Sesion: $vpValRet" N S
+            f_msg
+            echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+            read ValConf
+            f_msg
+         fi
+         if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ] && [ "$EJECUOPC11" = "S" ]; then
+            f_msg "--------------------------------------------------------------------------------" N S
+            f_msg
+            vFileLOG="${DIRLOG}/repcompBP$FechaREP.log"
+            vFileLOGERR="${DIRLOG}/repcompBP$FechaREP.err"
+            pEntAdq="BP"
+            pFecProc=$FechaREP
+            vFileCTL="${DIRDAT}/REPCOMP${pEntAdq}.${pFecProc}.CTL"
+            f_admCTL R
+            if [ "$vEstProc" = "F" ] && [ "$vOpcRepro" != "S" ]
+            then
+               tput setf 8
+               echo "el Reporte de Compensacion PLATCO para este dia ya ha sido procesado"
+               tput setf 7
+               echo
+               echo "... presione [ENTER] para continuar."
+               read vContinua
+            else
+               if [ -f "$vFileLOG" ]; then
+                  rm -f $vFileLOG
+               fi
+               touch $vFileLOG
+               echo
+               echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+               echo "   Archivo LOG de Errores   : `basename ${vFileLOGERR}`"
+               echo "                 Directorio : `dirname ${vFileLOG}`"
+               $DIRBIN/SGCREPCOMP.sh BP 1 $FechaREP
+               grep 'Error' $vFileLOG > /dev/null 2>&1
+               ERRSTATUS=$?
+               vSubProc="00"
+               if [ "$ERRSTATUS" = "0" ]
+               then
+                  vEstProc="E"
+               else
+                  vEstProc="F"
+               fi
+               f_admCTL W
+               echo "Log de Ejecucion (oprima q para salir)"
+               pg $vFileLOG
+#              echo "Log de Errores (oprima q para salir)"
+#              pg $vFileLOGERR
+               echo
+            fi
+#         else
+#            if [ "$EJECUOPC11" != "S" ]
+#            then
+#               echo $RAZONOPC11
+#               echo "... presione [ENTER] para continuar."
+#               read vContinua
+#            fi
+         fi
+      fi # Banco Provincial
+
+      if [ "$vOpcADQ" = "3" ]; then  # LOG GENERACION REPORTE COMPENSACION PLATCO - MERCANTIL
+            vFlgOpcErr="N"
+            vOpcion=""
+            vFileLOG="${DIRLOG}/repcompBM$FechaREP.log"
+            vFileLOGERR="${DIRLOG}/repcompBM$FechaREP.err"
+            echo "Log de Ejecucion (oprima q para salir)"
+            pg $vFileLOG
+#            echo "Log de Errores (oprima q para salir)"
+#            pg $vFileLOGERR
+      fi #  Log Generacion Reporte Compensacion PLATCO - Mercantil
+
+      if [ "$vOpcADQ" = "4" ]; then  # LOG GENERACION REPORTE COMPENSACION PLATCO - PROVINCIAL
+            vFlgOpcErr="N"
+            vOpcion=""
+            vFileLOG="${DIRLOG}/repcompBP$FechaREP.log"
+            vFileLOGERR="${DIRLOG}/repcompBP$FechaREP.err"
+            echo "Log de Ejecucion (oprima q para salir)"
+            pg $vFileLOG
+#            echo "Log de Errores (oprima q para salir)"
+#            pg $vFileLOGERR
+      fi #  Log Generacion Reporte Compensacion PLATCO - PROVINCIAL
+
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="10"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+   fi # Opcion 8 - REPORTE COMPENSACION DE LAS MARCAS
+
+
+   if [ "$vFlgOpcErr" = "S" ]; then
+      vOpcion=""
+      echo
+      f_msg "${dpNom} - Opcion Incorrecta."
+      echo
+      echo "... presione [ENTER] para continuar."
+      read vContinua
+   fi
+
+done
+
+################################################################################
+## FIN | PROCEDIMIENTO PRINCIPAL
+################################################################################

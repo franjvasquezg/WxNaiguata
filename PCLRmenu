@@ -1,0 +1,3019 @@
+#!/bin/ksh
+
+################################################################################
+##
+##  Nombre del Programa : SGCPCLRmenu.sh
+##                Autor : SSM
+##       Codigo Inicial : 01/05/2007
+##          Descripcion : Menu Principal del Proceso de Clearing
+##
+##  ======================== Registro de Modificaciones ========================
+##
+##  Fecha      Autor Version Descripcion de la Modificacion
+##  ---------- ----- ------- ---------------------------------------------------
+##  01/05/2007 SSM   1.00    Codigo Inicial
+##  19/11/2010 LMJ   1.30    Cambio en el MENU
+##  17/05/2011 JMG   1.50    Manejo de Outgoing independiente MC, VISA y PRICE
+##  23/05/2011 JMG   2.00    IPR 943: Cambio de Horario de Cierre
+##  06/12/2011 EEV   2.00    IPR 1039: Actualizacion menu operador
+##  22/02/2012 DCB   2.01    IPR 1039: Validacion de Archivos de Pre-Liquidacion
+##  24/08/2012 DCB   2.50    Inclusion de Logica de Cierre Automatico
+##  17/10/2012 DCB   2.51    Inclusion de Codigo para Forzar Reproceso (en caso de Mantenimiento)
+##  16/11/2012 DCB   2.52    Incorporacion de IPR 1087 al Cierre Automatico
+##  22/01/2020 DCB   3.00    Incorporacion de IPR 1302 al Cierre Automatico NGTA
+################################################################################
+
+################################################################################
+## DECLARACION DE DATOS, PARAMETROS DE EJECUCION Y VARIABLES DEL PROGRAMA
+################################################################################
+
+
+## Datos del Programa
+################################################################################
+
+dpNom="SGCPCLRmenu"           # Nombre del Programa
+dpDesc=""                     # Descripcion del Programa
+dpVer=2.52                    # Ultima Version del Programa
+dpFec="20121116"              # Fecha de Ultima Actualizacion [Formato:AAAAMMDD]
+
+## Variables del Programa
+################################################################################
+
+vpValRet=""                   # Valor de Retorno (funciones)
+vpFH=`date '+%Y%m%d%H%M%S'`   # Fecha y Hora [Formato:AAAAMMDDHHMMSS]
+vpFileLOG=""                  # Nombre del Archivo LOG del Programa
+
+## Variables de Trabajo
+################################################################################
+
+vFecSes=""                    # Fecha de Sesion (SYSDATE-1)
+##################################################################################
+## IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+vFecAbo=""                    # Fecha de Abono (SYSDATE)
+##################################################################################
+## Fin IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+vOpcRepro=""                  # Opcion de Reproceso
+vCodHCierre=""                # Codigo de Hora de Cierre
+vHCierre=""                   # Hora de Cierre
+vReproceso=""                 # Descripcion de Opcion de Reproceso
+vFileCTL=""                   # Archivo de Control
+vEstCLR=""                    # Estado del Proceso de Clearing
+vEstPLIQ=""                   # Estado de la Interfaz PLIQ
+vEstOUTMC=""                  # Estado del Proceso de Outgoing Mastercard
+vEstOUTVISA=""                # Estado del Proceso de Outgoing VISA
+vEstOUTPRICE=""               # Estado del Proceso de Outgoing PRICE
+vEstOUTVISA_NGTA=""           # Estado del Proceso de Outgoing VISA NGTA
+vEstOUTMC_NGTA=""             # Estado del Proceso de Outgoing Master Card NGTA
+vNomEst=""                    # Nombre del Estado del Proceso
+
+vHCierre1=""                  # Hora de Cierre Nro 1
+vHCierre2=""                  # Hora de Cierre Nro 2
+vFRepro="N"                   # Forzar Reproceso (en caso de Mantenimiento, SOLO CIERRE AUTOMATICO)
+
+#Recipientes de Correo para Outgoing Marcas
+
+vMAILREC="cecomp.tst.ve@telefonica.com"
+vMAILRECC="lowin.moreno@telefonica.com,diego.mendoza@telefonica.com"
+
+################################################################################
+## DECLARACION DE FUNCIONES
+################################################################################
+
+
+# f_msg | muestra mensaje en pantalla
+# Parametros
+#   pMsg    : mensaje a mostrar
+#   pRegLOG : registra mensaje en el LOG del Proceso [S=Si(default)/N=No]
+################################################################################
+f_msg ()
+{
+pMsg="$1"
+pRegLOG="$2"
+if [ "${pMsg}" = "" ]; then
+   echo
+   if [ "${vpFileLOG}" != "" ]; then
+      echo >> ${vpFileLOG}
+   fi
+else
+   echo "${pMsg}"
+   if [ "${vpFileLOG}" != "" ]; then
+      if [ "${pRegLOG}" = "S" ] || [ "${pRegLOG}" = "" ]; then
+         echo "${pMsg}" >> ${vpFileLOG}
+      fi
+   fi
+fi
+}
+
+
+# f_fhmsg | muestra mensaje con la fecha y hora del sistema
+# Parametros
+#   pMsg    : mensaje a mostrar
+#   pFlgFH  : muestra fecha y hora [S=Si(default)/N=No]
+#   pRegLOG : registra mensaje en el LOG del Proceso [S=Si(default)/N=No]
+################################################################################
+f_fhmsg ()
+{
+pMsg="$1"
+pFlgFH="$2"
+pRegLOG="$3"
+if [ "$pMsg" = "" ]; then
+   f_msg
+else
+   if [ "$pFlgFH" = "S" ] || [ "$pFlgFH" = "" ]; then
+      pMsg="`date '+%H:%M:%S'` > ${pMsg}"
+   else
+      pMsg="         > ${pMsg}"
+   fi
+   f_msg "${pMsg}" ${pRegLOG}
+fi
+}
+
+
+# f_fechora | cambia el formato de la fecha y hora
+#             YYYYMMDD > DD/MM/YYYY
+#             HHMMSS > HH:MM:SS
+#             YYYYMMDDHHMMSS > DD/MM/YYYY HH:MM:SS
+# Parametros
+#   pFH : fecha/hora
+################################################################################
+f_fechora ()
+{
+pFH="$1"
+vLong=`echo ${pFH} | awk '{print length($0)}'`
+case ${vLong} in
+     8)  # Fecha
+         vDia=`echo $pFH | awk '{print substr($0,7,2)}'`
+         vMes=`echo $pFH | awk '{print substr($0,5,2)}'`
+         vAno=`echo $pFH | awk '{print substr($0,1,4)}'`
+         vpValRet="${vDia}/${vMes}/${vAno}";;
+     6)  # Hora
+         vHra=`echo $pFH | awk '{print substr($0,1,2)}'`
+         vMin=`echo $pFH | awk '{print substr($0,3,2)}'`
+         vSeg=`echo $pFH | awk '{print substr($0,5,2)}'`
+         vpValRet="${vHra}:${vMin}:${vSeg}";;
+     14) # Fecha y Hora
+         vDia=`echo $pFH | awk '{print substr($0,7,2)}'`
+         vMes=`echo $pFH | awk '{print substr($0,5,2)}'`
+         vAno=`echo $pFH | awk '{print substr($0,1,4)}'`
+         vHra=`echo $pFH | awk '{print substr($0,9,2)}'`
+         vMin=`echo $pFH | awk '{print substr($0,11,2)}'`
+         vSeg=`echo $pFH | awk '{print substr($0,13,2)}'`
+         vpValRet="${vDia}/${vMes}/${vAno} ${vHra}:${vMin}:${vSeg}";;
+esac
+}
+
+# f_admCTL () | administra el Archivo de Control (lee/escribe)
+# Parametros
+#   pOpcion   : R=lee/W=escribe
+################################################################################
+f_admCTL ()
+{
+
+  # Estructura del Archivo de Control
+  # [01-08] Fecha de Sesion
+  # [10-10] Codigo de Hora de Cierre
+  # [12-12] Estado del Proceso de Clearing
+  # [14-14] Estado de la Interfaz PLIQ
+  # [16-16] Estado del Proceso de Outgoing VISA
+  # [18-18] Estado del Proceso de Outgoing MC
+  # [20-20] Estado del Proceso de Outgoing PRICE
+  # [22-35] Fecha y Hora de Actualizacion de los Estados [AAAAMMDDHHMMSS]
+
+  pOpcion="$1"
+  ##echo $vCodHCierre ##pruebas naiguata ipr1302
+  ##echo $vFecSes
+  if [ "$pOpcion" = "R" ]; then
+     test ! -f $vFileCTL
+     if [ "$?" = "0" ]; then
+        # Crea el Archivo CTL
+        ##echo "SGCPCLR ENTRO CREAR EL ARCHIVO CTL en PCLRmenu" #PRUEBAS IPR1302
+        vEstCLR="0"
+        vEstPLIQ="0"
+        vEstOUTVISA="0"
+        vEstOUTMC="0"
+        vEstOUTPRICE="0"
+        vEstOUTVISA_NGTA="0"           # Estado del Proceso de Outgoing VISA NGTA
+        vEstOUTMC_NGTA="0"             # Estado del Proceso de Outgoing Master Card NGTA
+        echo "${vFecSes}|${vCodHCierre}|${vEstCLR}|${vEstPLIQ}|${vEstOUTVISA}|${vEstOUTMC}|${vEstOUTPRICE}|${vEstOUTVISA_NGTA}|${vEstOUTMC_NGTA}|`date '+%Y%m%d%H%M%S'`" > $vFileCTL
+     else
+        ##echo "SGCPCLR ENTRO BUSCA DATOS EN CTL en PCLRmenu" #PRUEBAS IPR1302
+        vEstCLR=`awk '{print substr($0,12,1)}' $vFileCTL`
+        vEstPLIQ=`awk '{print substr($0,14,1)}' $vFileCTL`
+        vEstOUTVISA=`awk '{print substr($0,16,1)}' $vFileCTL`
+        vEstOUTMC=`awk '{print substr($0,18,1)}' $vFileCTL`
+        vEstOUTPRICE=`awk '{print substr($0,20,1)}' $vFileCTL`
+        vEstOUTVISA_NGTA=`awk '{print substr($0,22,1)}' $vFileCTL`           
+        vEstOUTMC_NGTA=`awk '{print substr($0,24,1)}' $vFileCTL`         
+     fi
+  else
+     ##echo "vEstCLR: $vEstCLR vEstPLIQ: $vEstPLIQ en el SC PCLRmenu" #PRUEBAS IPR1302
+     ##echo "Actualizo archivo de control con los vEstCLR, vEstPLIQ Actualizados "
+     echo "${vFecSes}|${vCodHCierre}|${vEstCLR}|${vEstPLIQ}|${vEstOUTVISA}|${vEstOUTMC}|${vEstOUTPRICE}|${vEstOUTVISA_NGTA}|${vEstOUTMC_NGTA}|`date '+%Y%m%d%H%M%S'`" > $vFileCTL     
+  fi
+
+}
+
+
+# f_getNomEst () | nombre del estado de proceso
+# Parametros
+#   pEstado   : estado del proceso
+################################################################################
+f_getNomEst ()
+{
+
+  pEstado="$1"
+
+  case $pEstado in
+
+       0)
+          vNomEst="PENDIENTE";;
+       P)
+          vNomEst="EN PROCESO";;
+       F)
+          vNomEst="FINALIZADO";;
+       E)
+          vNomEst="FIN ERROR";;
+       *)
+          vNomEst="DESCONOCIDO";;
+  esac
+
+}
+
+
+# f_menuCAB () | administra el Archivo de Control (lee/escribe)
+################################################################################
+f_menuCAB ()
+{
+
+   clear
+   echo "*******************************************************************************"
+   echo "*                       SISTEMA DE GESTION DE COMERCIOS                  ${COD_AMBIENTE} *"
+   echo "*                             Proceso de Clearing                             *"
+   echo "*******************************************************************************"
+
+}
+
+
+# f_menuDAT () | menu de informacion
+################################################################################
+f_menuDAT ()
+{
+
+   # Lee Archivo de Control
+   f_admCTL R
+
+
+   if [ "$vOpcRepro" = "S" ]; then
+      vRepro="SI"
+   else
+      vRepro="NO"
+   fi
+
+   if [ "$vCodHCierre" = "1" ]; then
+      vHCierre="${vHCierre1}"
+   else
+      vHCierre="${vHCierre2}"
+   fi
+
+   f_fechora $vFecSes
+   f_getNomEst $vEstCLR
+   echo " Fecha de Sesion: $vpValRet                   Estado del Proceso: $vNomEst"
+   echo " Hora de Cierre : $vHCierre hrs.                            Reproceso: $vRepro"
+
+}
+
+
+
+# f_menuOPC () | menu de opciones
+################################################################################
+f_menuOPC ()
+{
+
+if [ "${vCodHCierre}" = "1" ]; then
+
+   echo "-------------------------------------------------------------------------------"
+   echo
+   echo "   PROCESOS                           CONSULTAS"
+   echo "  ---------------------------------  ----------------------------------------"
+   echo "  [ 0] Hora de Cierre                  [ 2] Reporte de Cuadre de Clearing"
+   echo "  [ 1] Proceso de Cierre Automatico    [ 3] LOG de Procesos"   
+   echo "      "
+##################################################################################
+## IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+   echo "   PROCESOS EVENTUALES                CONFIGURACION"
+   echo "  ---------------------------------  ----------------------------------------"
+   echo "    [55] Proceso de Clearing           "
+   echo "    [98] Proceso de Clearing Eventual  [ 4] Fecha de Sesion"
+   echo "    [99] Cierre Automatico Eventual    [ 5] Opcion de Reproceso"
+##################################################################################
+## Fin IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+   echo ""
+   echo
+   echo "-------------------------------------------------------------------------------"
+   echo " Ver $dpVer | Telefonica Servicios Transaccionales                     [Q] Salir"
+   echo "-------------------------------------------------------------------------------"
+
+else
+
+   echo "-------------------------------------------------------------------------------"
+   echo
+   echo "   PROCESOS                           CONSULTAS"
+   echo "  ---------------------------------  ----------------------------------------"
+   echo "  [ 0] Hora de Cierre                  [ 2] Reporte de Cuadre de Clearing"
+   echo "  [ 1] Proceso de Cierre Automatico    [ 3] LOG de Procesos"   
+   echo "      "
+##################################################################################
+## IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+   echo "   PROCESOS EVENTUALES                CONFIGURACION"
+   echo "  ---------------------------------  ----------------------------------------"
+   echo "    [55] Proceso de Clearing           "
+   echo "    [98] Proceso de Clearing Eventual  [ 4] Fecha de Sesion"
+   echo "    [99] Cierre Automatico Eventual    [ 5] Opcion de Reproceso"
+##################################################################################
+## Fin IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+   echo ""
+   echo
+   echo "-------------------------------------------------------------------------------"
+   echo " Ver $dpVer | Telefonica Servicios Transaccionales                     [Q] Salir"
+   echo "-------------------------------------------------------------------------------"
+
+fi
+
+}
+
+# f_getFECHA () | Obtiene Fechas de Sesion y Abono
+################################################################################
+f_getFECHA ()
+{
+	vFecProc=`getdate`
+	vFecSes=`ORAExec.sh "exec :rC:=PQPLIQ.GetFecProc2Ses('${vFecProc}','XX','${vCodHCierre}');" $DB`
+##################################################################################
+## IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+        vFecAbo=`ORAExec.sh "exec :rC:=PQPLIQ.GetFecSes2Abo('${vFecSes}');" $DB`
+	     vFecSes=`echo ${vFecSes} | awk '{print substr($0,1,8)}'`
+        vFecAbo=`echo ${vFecAbo} | awk '{print substr($0,1,8)}'`
+##################################################################################
+## FIN IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+}
+
+##################################################################################
+## IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+# v_arch_preliq () | Valida que las Preliquidaciones hayan terminado correctamente
+##################################################################################
+v_arch_preliq ()
+{
+       vContador=""
+       vLimContador=""
+       vHoraPreliq=""
+       vEntidad=""
+       vEstCLRRH=""
+       vEstLIQRH=""
+       vCLRLIQERR="N"
+       vARCHERR=""
+       vARCHCTLENEXT=""
+       vLimContador=`echo $vHCierre | awk '{print substr($0,1,2)}'`
+       vContador=$vLimContador
+       vFecAbo=`ORAExec.sh "exec :rC:=PQPLIQ.GetFecSes2Abo('${vFecSes}');" $DB`
+       vFecAbo=`echo ${vFecAbo} | awk '{print substr($0,1,8)}'`
+       if [ "$vCodHCierre" = "1" ]
+       then
+          vFecSes1=`sqlplus -s $DB << !
+set head off
+set pagesize 0000
+select to_char(to_date('$vFecSes','YYYYMMDD')-1,'YYYYMMDD') from dual;
+! #############################`
+
+#          echo "Verificando Archivos de Preliquidacion Banco Mercantil Para la Fecha de Sesion $vFecSes1"
+          vEntidad=BM
+          ver_preliqc1a
+#          echo "Verificando Archivos de Preliquidacion Banco Provincial Para la Fecha de Sesion $vFecSes1"
+          vEntidad=BP
+          vContador=$vLimContador
+          ver_preliqc1a
+          vLimContador=`expr $vLimContador - 1`
+          if [ "$vLimContador" -lt 0 ]
+          then
+             vLimContador=0
+          fi
+#          echo "Verificando Archivos de Preliquidacion Banco Mercantil Para la Fecha de Sesion $vFecSes"
+          vEntidad=BM
+          vContador=0
+          ver_preliqc1b
+#          echo "Verificando Archivos de Preliquidacion Banco Provincial Para la Fecha de Sesion $vFeSes"
+          vEntidad=BP
+          vContador=0
+          ver_preliqc1b
+       fi
+       if [ "$vCodHCierre" = "2" ]
+       then
+#          echo "Verificando Archivos de Preliquidacion Banco Mercantil Para la Fecha de Sesion $vFecSes"
+          vEntidad=BM
+          ver_preliqc2a
+#          echo "Verificando Archivos de Preliquidacion Banco Provincial Para la Fecha de Sesion $vFecSes"
+          vEntidad=BP
+          vContador=$vLimContador
+          ver_preliqc2a
+          vLimContador=`expr $vLimContador - 1`
+          if [ "$vLimContador" -lt 0 ]
+          then
+             vLimContador=0
+          fi
+#          echo "Verificando Archivos de Preliquidacion Banco Mercantil Para la Fecha de Abono $vFecAbo"
+          vEntidad=BM
+          vContador=0
+          ver_preliqc2b
+#          echo "Verificando Archivos de Preliquidacion Banco Provincial Para la Fecha de Abono $vFecAbo"
+          vEntidad=BP
+          vContador=0
+          ver_preliqc2b
+        fi
+}
+ver_preliqc1a()
+{
+          while [ ${vContador} -le 23 ]
+          do
+              vHoraPreliq=`printf "%0.2d" ${vContador}`
+              if [ -f ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes1}.${vCodHCierre}.${vHoraPreliq}.CTL ]
+              then
+                 vEstCLRRH=`awk '{ print substr($0,15,1) }' ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes1}.${vCodHCierre}.${vHoraPreliq}.CTL`
+                 vEstLIQRH=`awk '{ print substr($0,17,1) }' ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes1}.${vCodHCierre}.${vHoraPreliq}.CTL`
+                 vARCHCTLENEXT="S"
+              else
+                  vCLRLIQERR="S"
+                  vARCHCTLENEXT="N"
+                  vARCHERR="$vARCHERR ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes1}.${vCodHCierre}.${vHoraPreliq}.CTL"
+              fi
+              if [ "$vARCHCTLENEXT" = "S" ] && [ "$vEstCLRRH" != "F" ] || [ "$vEstLIQRH" != "F" ]
+              then
+                  vCLRLIQERR="S"
+                  vARCHERR="$vARCHERR ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes1}.${vCodHCierre}.${vHoraPreliq}.CTL"
+                  vARCHCTLENEXT="N"
+              fi
+              vContador=`expr $vContador + 1`
+          done
+}
+ver_preliqc1b()
+{
+          while [ ${vContador} -le ${vLimContador} ]
+          do
+              vHoraPreliq=`printf "%0.2d" ${vContador}`
+              if [ -f ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL ]
+              then
+                 vEstCLRRH=`awk '{ print substr($0,15,1) }' ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL`
+                 vEstLIQRH=`awk '{ print substr($0,17,1) }' ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL`
+                 vARCHCTLENEXT="S"
+              else
+                  vCLRLIQERR="S"
+                  vARCHCTLENEXT="N"
+                  vARCHERR="$vARCHERR ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL"
+              fi
+              if [ "$vARCHCTLENEXT" = "S" ] && [ "$vEstCLRRH" != "F" ] || [ "$vEstLIQRH" != "F" ]
+              then
+                  vCLRLIQERR="S"
+                  vARCHERR="$vARCHERR ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL"
+                  vARCHCTLENEXT="N"
+              fi
+              vContador=`expr $vContador + 1`
+          done
+}
+ver_preliqc2a()
+{
+          while [ ${vContador} -le 23 ]
+          do
+              vHoraPreliq=`printf "%0.2d" ${vContador}`
+              if [ -f ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL ]
+              then
+                 vEstCLRRH=`awk '{ print substr($0,15,1) }' ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL`
+                 vEstLIQRH=`awk '{ print substr($0,17,1) }' ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL`
+                 vARCHCTLENEXT="S"
+              else
+                  vCLRLIQERR="S"
+                  vARCHCTLENEXT="N"
+                  vARCHERR="$vARCHERR ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL"
+              fi
+              if [ "$vARCHCTLENEXT" = "S" ] && [ "$vEstCLRRH" != "F" ] || [ "$vEstLIQRH" != "F" ]
+              then
+                  vCLRLIQERR="S"
+                  vARCHERR="$vARCHERR ${DIRDAT}/SGCPCLR${vEntidad}${vFecSes}.${vCodHCierre}.${vHoraPreliq}.CTL"
+                  vARCHCTLENEXT="N"
+              fi
+              vContador=`expr $vContador + 1`
+          done
+}
+ver_preliqc2b()
+{
+          while [ ${vContador} -le ${vLimContador} ]
+          do
+              vHoraPreliq=`printf "%0.2d" ${vContador}`
+              if [ -f ${DIRDAT}/SGCPCLR${vEntidad}${vFecAbo}.${vCodHCierre}.${vHoraPreliq}.CTL ]
+              then
+                 vEstCLRRH=`awk '{ print substr($0,15,1) }' ${DIRDAT}/SGCPCLR${vEntidad}${vFecAbo}.${vCodHCierre}.${vHoraPreliq}.CTL`
+                 vEstLIQRH=`awk '{ print substr($0,17,1) }' ${DIRDAT}/SGCPCLR${vEntidad}${vFecAbo}.${vCodHCierre}.${vHoraPreliq}.CTL`
+                 vARCHCTLENEXT="S"
+              else
+                  vCLRLIQERR="S"
+                  vARCHCTLENEXT="N"
+                  vARCHERR="$vARCHERR ${DIRDAT}/SGCPCLR${vEntidad}${vFecAbo}.${vCodHCierre}.${vHoraPreliq}.CTL"
+              fi
+              if [ "$vARCHCTLENEXT" = "S" ] && [ "$vEstCLRRH" != "F" ] || [ "$vEstLIQRH" != "F" ]
+              then
+                  vCLRLIQERR="S"
+                  vARCHERR="$vARCHERR ${DIRDAT}/SGCPCLR${vEntidad}${vFecAbo}.${vCodHCierre}.${vHoraPreliq}.CTL"
+                  vARCHCTLENEXT="N"
+              fi
+              vContador=`expr $vContador + 1`
+          done
+}
+##################################################################################
+## FIN IPR 1039: Proceso de Validacion de Preliquidaciones
+## 22/02/2012 DCB
+##################################################################################
+
+Decode_Subproc()
+{
+   case $1 in
+
+      01) vSTRSubProc="Actualizaciones Pendientes de la Liquidacion";;
+      02) vSTRSubProc="Actualizaciones de Tasas IVA e ISLR Banco Mercantil";;
+      03) vSTRSubProc="Actualizaciones de Tasas IVA e ISLR Banco Provincial";;
+      04) vSTRSubProc="Reporte ISLR Banco Mercantil";;
+      05) vSTRSubProc="Reporte ISLR Banco Provincial";;
+      06) vSTRSubProc="Generacion de Lote Adquiriente";;
+      07) vSTRSubProc="Liquidacion Sodexho";;
+      08) vSTRSubProc="Reporte de Remesa Sodexho";;
+      09) vSTRSubProc="Archivos de Comercios Sodexho";;
+      10) vSTRSubProc="Generacion de Archivos Casa Matriz";;
+      11) vSTRSubProc="Resumen de Movimientos (Terminales)";;
+      12) vSTRSubProc="Carga de Conformidad de Visita";;
+      13) vSTRSubProc="Carga de Estadisticas Banco Mercantil";;
+      14) vSTRSubProc="Carga de Estadisticas Banco Provincial";;
+      15) vSTRSubProc="Carga de Reportes de Facturacion Banco Mercantil";;
+      16) vSTRSubProc="Carga de Reportes de Facturacion Banco Provincial";;
+      17) vSTRSubProc="Carga de Resumen de Ventas Banco Mercantil";;
+      18) vSTRSubProc="Carga de Resumen de Ventas Banco Provincial";;
+      19) vSTRSubProc="Resumen de Liquidacion";;
+      20) vSTRSubProc="Interfaz para Comercios en Linea (ICEL)";;
+      21) vSTRSubProc="Cambio de Adquiriencia (CEL)";;
+      22) vSTRSubProc="Carga de Reportes de Facturacion Platco-Banco Mercantil";;
+      23) vSTRSubProc="Carga de Reportes de Facturacion Platco-Banco Provincial";;
+      24) vSTRSubProc="Actualizacion de Transacciones Premiadas con Reverso";;
+   esac
+
+}
+
+transfISLRBM()
+{
+   echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+   echo "Copiando Archivos de ISLR al area de" | tee -a $vAutoLog
+   echo "Acceso del Banco Mercantil" | tee -a $vAutoLog
+   echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+   vDIRSRC="${DIROUT}"
+   vFileParSSH="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SSH"
+   vARCHISLRBMOK=0
+   vSSHERROR=0
+   vDIRTGT="BMpu_fileout"
+   vArchBanco="ISLR0105${vFecAbo}.DAT"
+   if [ ! -s $vDIRSRC/$vArchBanco ]
+   then
+      vARCHISLRBMOK=1
+      vSSHERROR=1
+      tput setf 8
+      echo "***************************************************************************" | tee -a $vAutoLog
+      echo "El Archivo de ISLR del Banco Mercantil" | tee -a $vAutoLog
+      echo "Archivo: $vDIRSRC/$vArchBanco" | tee -a $vAutoLog
+      echo "No Existe o esta Vacio" | tee -a $vAutoLog
+      echo "Esto Indica una falla no detectada en el Sub-Proceso de ISLR" | tee -a $vAutoLog
+      echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+      echo "***************************************************************************" | tee -a $vAutoLog
+      tput setf 7
+      sqlplus -s $DB @$DIRBIN/alertacie ISR ISLRBP "ISLR_Banco_Mercantil_Archivo_$vArchBanco_No_Existe_o_Vacio"
+   fi
+   if [ "$vARCHISLRBMOK" = "0" ]
+   then
+      scp -B -q $vDIRSRC/$vArchBanco ${SSSH_USER}@${FTP_HOSTXCOM}:${vDIRTGT}/${vArchBanco}.FTP 2>&1 | tee -a $vAutoLog
+      vSSHStat=$?
+      if [ "$vSSHStat" != "0" ]
+      then
+         vSSHERROR=1
+      fi
+      ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "chmod 644 $vDIRTGT/$vArchBanco.FTP" 2> $vFileParSSH
+      ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "mv $vDIRTGT/$vArchBanco.FTP $vDIRTGT/$vArchBanco" 2>> $vFileParSSH
+      vSSHStat=$?
+      if [ "$vSSHStat" != "0" ]
+      then
+         vSSHERROR=1
+         cat $vFileParSSH >> $vAutoLog
+      fi
+   fi
+   if [ "$vSSHERROR" = "0" ]
+   then
+       echo "***************************************************************************" | tee -a $vAutoLog
+       echo "Copia de Archivos de ISLR" | tee -a $vAutoLog
+       echo "al area de Acceso del Banco Mercantil Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+       echo "***************************************************************************" | tee -a $vAutoLog
+       rm $vFileParSSH
+   else
+       tput setf 8
+       echo "***************************************************************************" | tee -a $vAutoLog
+       echo "Copia de Archivos de ISLR" | tee -a $vAutoLog
+       echo "al area de Acceso del Banco Mercantil Finalizada EN ERROR" | tee -a $vAutoLog
+       echo "***************************************************************************" | tee -a $vAutoLog
+       tput setf 7
+       sqlplus -s $DB @$DIRBIN/alertacie ISR TISLRBP "Transferencia_de_Archivo_de_ISLR_Banco_Mercantil_Fallida"
+   fi
+}
+
+transfISLRBP()
+{
+       echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+       echo "Copiando Archivos de ISLR al area de" | tee -a $vAutoLog
+       echo "Acceso del Banco Provincial" | tee -a $vAutoLog
+       echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+       vDIRSRC="${DIROUT}"
+       vFileParSSH="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SSH"
+                       vSSHERROR=0
+                       vARCHISLRBPOK=0
+                       vDIRTGT="BPpu_fileout"
+                       vArchBanco="ISLR0108${vFecAbo}.DAT"
+                       if [ ! -s $vDIRSRC/$vArchBanco ]
+                       then
+                          vARCHISLRBPOK=1
+                          vSSHERROR=1
+                          tput setf 8
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          echo "El Archivo de ISLR del Banco Provincial" | tee -a $vAutoLog
+                          echo "Archivo: $vDIRSRC/$vArchBanco" | tee -a $vAutoLog
+                          echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                          echo "Esto Indica una falla no detectada en el Sub-Proceso de ISLR" | tee -a $vAutoLog
+                          echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          tput setf 7
+                          sqlplus -s $DB @$DIRBIN/alertacie ISR ISLRBM "ISLR_Banco_Provincial_Archivo_$vArchBanco_No_Existe_o_Vacio"
+                       fi
+                       if [ "$vARCHISLRBPOK" = "0" ]
+                       then
+                          scp -B -q $vDIRSRC/$vArchBanco ${SSSH_USER}@${FTP_HOSTXCOM}:${vDIRTGT}/${vArchBanco}.FTP 2>&1 | tee -a $vAutoLog
+                          vSSHStat=$?
+                          if [ "$vSSHStat" != "0" ]
+                             then
+                             vSSHERROR=1
+                          fi
+                          ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "chmod 644 $vDIRTGT/$vArchBanco.FTP" 2> $vFileParSSH
+                          ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "mv $vDIRTGT/$vArchBanco.FTP $vDIRTGT/$vArchBanco" 2>> $vFileParSSH
+                          vSSHStat=$?
+                          if [ "$vSSHStat" != "0" ]
+                          then
+                             vSSHERROR=1
+                             cat $vFileParSSH >> $vAutoLog
+                          fi
+                       fi
+                       if [ "$vSSHERROR" = "0" ]
+                       then
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          echo "Copia de Archivos de ISLR" | tee -a $vAutoLog
+                          echo "al area de Acceso del Banco Provincial Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          rm $vFileParSSH
+                       else
+                          tput setf 8
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          echo "Copia de Archivos de ISLR" | tee -a $vAutoLog
+                          echo "al area de Acceso del Banco Provincial Finalizada EN ERROR" | tee -a $vAutoLog
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          tput setf 7
+                          sqlplus -s $DB @$DIRBIN/alertacie ISR TISLRBM "Transferencia_de_Archivo_de_ISLR_Banco_Provincial_Fallida"
+                       fi
+}
+transfLA()
+{
+                       echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                       echo "Copiando Archivos de Lote Adquiriente al area de" | tee -a $vAutoLog
+                       echo "Acceso de los Bancos" | tee -a $vAutoLog
+                       echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                       vDIRSRC="${DIROUT}"
+                       vFileParSSH="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SSH"
+                       vSSHERROR=0
+                       vARCHILAOK=0
+                       ADQUIRIENTES="BM BP"
+                       for pCodEntAdq in $ADQUIRIENTES
+                       do
+                         vDIRTGT="${pCodEntAdq}pu_fileout"
+                         case $pCodEntAdq in
+                           BM)
+                             vCodBanco=0105;;
+                           BP)
+                             vCodBanco=0108;;
+                         esac
+                         vArchBanco="LA${vCodBanco}${vFecSes}.DAT"
+                         if [ ! -s $vDIRSRC/$vArchBanco ]
+                         then
+                            vARCHILAOK=1
+                            vSSHERROR=1
+                            tput setf 8
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            echo "El Archivo de Lote Adquiriente de $vCodBanco" | tee -a $vAutoLog
+                            echo "Archivo: $vDIRSRC/$vArchBanco" | tee -a $vAutoLog
+                            echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                            echo "Esto Indica una falla no detectada en el Sub-Proceso de Lote Adquiriente" | tee -a $vAutoLog
+                            echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            tput setf 7
+                            sqlplus -s $DB @$DIRBIN/alertacie LAQ LOTEADQ "Lote_Adquiriente_Archivo_$vArchBanco_No_Existe_o_Vacio"
+                         fi 
+                         if [ "$vARCHILAOK" = "0" ]
+                         then
+                            scp -B -q $vDIRSRC/$vArchBanco ${SSSH_USER}@${FTP_HOSTXCOM}:${vDIRTGT}/${vArchBanco}.FTP 2>&1 | tee -a $vAutoLog
+                            vSSHStat=$?
+                            if [ "$vSSHStat" != "0" ]
+                            then
+                               vSSHERROR=1
+                            fi
+                            ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "chmod 644 $vDIRTGT/$vArchBanco.FTP" 2> $vFileParSSH
+                            ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "mv $vDIRTGT/$vArchBanco.FTP $vDIRTGT/$vArchBanco" 2>> $vFileParSSH
+                            vSSHStat=$?
+                            if [ "$vSSHStat" != "0" ]
+                            then
+                               vSSHERROR=1
+                               cat $vFileParSSH >> $vAutoLog
+                            fi
+                         fi
+                       done
+                       if [ "$vSSHERROR" = "0" ]
+                       then
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          echo "Copia de Archivos de Lote Adquiriente" | tee -a $vAutoLog
+                          echo "al area de Acceso de los Bancos Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          rm $vFileParSSH
+                       else
+                          tput setf 8
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          echo "Copia de Archivos de Lote Adquiriente" | tee -a $vAutoLog
+                          echo "al area de Acceso de los Bancos Finalizada EN ERROR" | tee -a $vAutoLog
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          tput setf 7
+                          sqlplus -s $DB @$DIRBIN/alertacie LAQ TLOTEADQ "Transferencia_de_Archivos de_Lote_Adquiriente_Fallida"
+                       fi
+}
+transfSDX()
+{
+                       echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                       echo "Copiando Archivos de SODEXHO al area de" | tee -a $vAutoLog
+                       echo "Acceso del Banco Provincial" | tee -a $vAutoLog
+                       echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                       vDIRSRC="${DIROUT}"
+                       vFileParSSH="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SSH"
+                       vSSHERROR=0
+                       vARCHISDXOK=0
+                       vDIRTGT="BPpu_fileout"
+                       for vPrefijo in SDXLQ SDXRM
+                       do
+                         vArchBanco="${vPrefijo}0108${vFecAbo}.DAT"
+                         if [ ! -s $vDIRSRC/$vArchBanco ]
+                         then
+                            tput setf 8
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            echo "El Archivo de SODEXHO del Banco Provincial" | tee -a $vAutoLog
+                            echo "Archivo: $vDIRSRC/$vArchBanco" | tee -a $vAutoLog
+                            echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                            echo "Esto Indica una falla no detectada en el Sub-Proceso de SODEXHO" | tee -a $vAutoLog
+                            echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            tput setf 7
+                            sqlplus -s $DB @$DIRBIN/alertacie SDX SDXBP "SODEXHO_Banco_Provincial_$vArchBanco_No_Existe_o_Vacio"
+                            vSSHERROR=0
+                            vARCHISDXOK=1
+                         fi 
+                         if [ "$vARCHISDXOK" = "0" ]
+                         then
+                            scp -B -q $vDIRSRC/$vArchBanco ${SSSH_USER}@${FTP_HOSTXCOM}:${vDIRTGT}/${vArchBanco}.FTP 2>&1 | tee -a $vAutoLog
+                            vSSHStat=$?
+                            if [ "$vSSHStat" != "0" ]
+                            then
+                               vSSHERROR=1
+                            fi
+                            ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "chmod 644 $vDIRTGT/$vArchBanco.FTP $vDIRTGT/$vArchBanco" 2> $vFileParSSH
+                            ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "mv $vDIRTGT/$vArchBanco.FTP $vDIRTGT/$vArchBanco" 2>> $vFileParSSH
+                            vSSHStat=$?
+                            if [ "$vSSHStat" != "0" ]
+                            then
+                               vSSHERROR=1
+                               cat $vFileParSSH >> $vAutoLog
+                            fi
+                         fi
+                       done
+                       if [ "$vSSHERROR" = "0" ]
+                       then
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          echo "Copia de Archivos de SODEXHO" | tee -a $vAutoLog
+                          echo "al area de Acceso del Banco Provincial Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          rm $vFileParSSH
+                       else
+                          tput setf 8
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          echo "Copia de Archivos de SODEXHO" | tee -a $vAutoLog
+                          echo "al area de Acceso del Banco Provincial Finalizada en ERROR" | tee -a $vAutoLog
+                          echo "***************************************************************************" | tee -a $vAutoLog
+                          tput setf 7
+                          sqlplus -s $DB @$DIRBIN/alertacie SDX TSDXBP "Transferencia_de_Archivos_de_SODEXHO_Banco_Provincial_Fallida"
+                       fi
+}
+transfCM()
+{
+                      echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                      echo "Copiando Archivos de Casa Matriz al Servidor Saliente" | tee -a $vAutoLog
+                      echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                      vSSHStat=0
+                      vSSHELOGSZ=0
+                      vSSHERROR=0
+                      vARCHICMOK=0
+                      vFileParSFTP="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SFTP"
+                      vFileBatSFTP="${DIRTMP}/${dpNom}_${vFHsys}.BAT.SFTP"
+                      vARCHCONF=$DIRBIN/tabla_merchant.cnf
+                      vPLIQCIEPROC=`ps -fu $vTSTUSER | grep SGCPMATRIZ.sh | grep -v grep | awk '{print $2}'`
+                      if [ "$vPLIQCIEPROC" ]
+                      then
+                           wait $vPLIQCIEPRIC
+                      fi
+                      if [ ! -s $vARCHCONF ]
+                      then
+                         tput setf 8
+                         echo "***************************************************************************" | tee -a $vAutoLog
+                         echo "El Archivo de Configuracion de Casa Matriz" | tee -a $vAutoLog
+                         echo "Archivo $vARCHCONF" | tee -a $vAutoLog
+                         echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                         echo "***************************************************************************" | tee -a $vAutoLog
+                         tput setf 7
+                         sqlplus -s $DB @$DIRBIN/alertaciep PCM PROCCM "Generacion_de_Archivos_de_Casa_Matriz_Archivo_de_Configuracion"
+                         vSSHERROR=1
+                      fi 
+                      cat $vARCHCONF | while read vLINE
+                      do
+                         vRIF=`echo $vLINE | cut -f1 -d';'`
+                         vEXT=`echo $vLINE | cut -f6 -d';'`
+                         vCOMPRESS=`echo $vLINE | cut -f2 -d';'`
+                         vHASH=`echo $vLINE | cut -f3 -d';'`
+                         vCONTENIDO=`echo $vLINE | cut -f4 -d';'`
+                         vUSUARIO=`echo $vLINE | cut -f5 -d';'`
+                         vMERCHANT=''
+                         vMERCHANT=`echo $vRIF | grep SDXRM0108`
+                         if [ "$vMERCHANT" ]
+                         then
+                            vARCHCMSRC="${DIROUT}/${vRIF}${vFecAbo}.DAT"
+                            vARCHCMDEST="${vRIF}${vFecAbo}.${vEXT}"
+                         else
+                            vARCHCMSRC="${DIROUT}/${vRIF}${vFecSes}.DAT"
+                            vARCHCMDEST="${vRIF}${vFecSes}.${vEXT}"
+                         fi
+                         if [ "$vCONTENIDO" = "SINANUL" ]
+                         then
+                            oraexec "exec PQINTERFACE_MATRIZ.pp_filematriz_new (TO_DATE('$vFecSes','YYYYMMDD'),'$vRIF');" $DB
+                            vSTAT=$?
+                            if [ $vSTAT != "0" ]
+                            then
+                              tput setf 8
+                              echo "***************************************************************************" | tee -a $vAutoLog
+                              echo "Proceso de Archivos sin ANULACIONES para Casa Matriz $vRIF" | tee -a $vAutoLog
+                              echo "Finalizado EN ERROR" | tee -a $vAutoLog
+                              echo "***************************************************************************" | tee -a $vAutoLog
+                              tput setf 7
+                              vSSHERROR=1
+                              sqlplus -s $DB @$DIRBIN/alertaciep PCM PROCCMSA "Generacion_de_Archivos_sin_Anulaciones_de_Casa_Matriz_Fallida"
+                              break
+                            fi
+                         fi
+                         if [ ! -s "$vARCHCMSRC" ] 
+                         then
+                           tput setf 8
+                           echo "***************************************************************************" | tee -a $vAutoLog
+                           echo "Archivo $vARCHCMSRC para Casa Matriz $vRIF" | tee -a $vAutoLog
+                           echo "NO EXISTE o esta vacio" | tee -a $vAutoLog
+                           echo "Esto Indica una falla no detectada en el Sub-Proceso de Casa Matriz" | tee -a $vAutoLog
+                           echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                           echo "***************************************************************************" | tee -a $vAutoLog
+                           tput setf 7
+                           vSSHERROR=1
+                           vARCHICMOK=1
+                           sqlplus -s $DB @$DIRBIN/alertaciep PCM PROCCM "Generacion_de_Archivos_de_Casa_Matriz_$vARCHCMSRC_No_Existe_o_Vacio"
+                           break
+                         fi
+                         if [ "$vCOMPRESS" = "S" ]
+                         then
+                            zip -9 -q -j "${DIROUT}/${vRIF}${vFecSes}.zip" $vARCHCMSRC
+                            vARCHCMSRC="${DIROUT}/${vRIF}${vFecSes}.zip"
+                            vARCHCMDEST="${vRIF}${vFecSes}.zip"
+                         fi
+                         if [ "$vHASH" = "S" ]
+                         then
+                             digest -a sha256 $vARCHCMSRC > "${DIROUT}/${vRIF}${vFecSes}.sha"
+                         fi
+                         echo "put $vARCHCMSRC $vARCHCMDEST" > $vFileBatSFTP
+                         if [ "$vHASH" = "S" ]
+                         then
+                             echo "put ${DIROUT}/${vRIF}${vFecSes}.sha ${vRIF}${vFecSes}.sha" >> $vFileBatSFTP
+                         fi
+                         if [ "$vARCHICMOK" = "0" ]
+                         then
+                            sftp -b $vFileBatSFTP -oPort=16530 ${vUSUARIO}@${SFTP_CM} > $vFileParSFTP 2>&1
+                            vSSHStat=$?
+                            vSSHELOGSZ=`/usr/xpg4/bin/grep -v -e mkdir -e put -e Uploading -e sftp -e Connecting $vFileParSFTP | wc -l`
+                            if [ "$vSSHStat" != "0" ] || [ "$vSSHELOGSZ" -gt "0" ]
+                            then
+                               vSSHERROR=1
+                               cat $vFileParSFTP | tee -a $vAutoLog
+                            fi
+                         fi
+                      done
+                      if [ "$vSSHERROR" = "0" ]
+                      then
+                         echo "***************************************************************************" | tee -a $vAutoLog
+                         echo "Copia de Archivos de Casa Matriz" | tee -a $vAutoLog
+                         echo "Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                         echo "***************************************************************************" | tee -a $vAutoLog
+                      rm $vFileBatSFTP 2>/dev/null
+                      rm $vFileParSFTP 2>/dev/null
+                      else
+                         tput setf 8
+                         echo "***************************************************************************" | tee -a $vAutoLog
+                         echo "Copia de Archivos de Casa Matriz" | tee -a $vAutoLog
+                         echo "Finalizada EN ERROR" | tee -a $vAutoLog
+                         echo "***************************************************************************" | tee -a $vAutoLog
+                         tput setf 7
+                         sqlplus -s $DB @$DIRBIN/alertacie PCM TPROCCM "Transferencia_de_Archivos_de_Casa_Matriz_Fallida"
+                      fi
+}
+salida()
+{
+   kill -9 $(jobs -p) > /dev/null 2>&1
+   exit 1
+}
+
+################################################################################
+## INICIO | PROCEDIMIENTO PRINCIPAL
+################################################################################
+
+
+## Hora de Cierre Descripcion
+################################################################################
+
+vHCierre1=`ORAExec.sh "exec :rC:=PQPLIQ.gHRA_CIERRE1;" $DB`
+vHCierre2=`ORAExec.sh "exec :rC:=PQPLIQ.gHRA_CIERRE2;" $DB`
+
+vHCierre1=`echo $vHCierre1 | awk '{print substr($0,1,5)}'`
+vHCierre2=`echo $vHCierre2 | awk '{print substr($0,1,5)}'`
+
+## Hora de Cierre
+################################################################################
+
+vFecAct=`date '+%H'`
+
+vCodHCierre="1"
+f_getFECHA
+
+vFileCTL="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+
+f_admCTL R
+if [ "$vEstCLR" = "F" ]; then
+   vCodHCierre="2"
+   f_getFECHA
+fi
+
+## Opcion de Reproceso
+################################################################################
+vOpcRepro="N"
+
+
+## Archivo de Control
+################################################################################
+
+vFileCTL="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+
+while ( test -z "$vOpcion" || true ) do
+
+   vFlgOpcErr="N"
+   vFileLOGCLR="${DIRLOG}/SGCPCLR${vFecSes}.${vCodHCierre}"
+   #vFileLOGPLIQ="${DIRLOG}/SGCPCLRPLIQ${vFecSes}.${vCodHCierre}"
+   #vFileLOGOUT="${DIRLOG}/SGCPCLROUT${vFecSes}.${vCodHCierre}"
+
+   f_menuCAB
+   f_menuDAT
+   f_menuOPC
+
+   if [ "${vOpcion}" = "" ]; then
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcion
+################################################################################
+# IPR 1039: Actualizacion Menu, adecuacion salir			       #
+# EEVN 									       #
+################################################################################
+      vOpcion=$(echo ${vOpcion}| tr "[:upper:]" "[:lower:]")
+      if [ "${vOpcion}" = "q" ]; then
+         echo "\n"
+         echo " Esta seguro que desea salir de PCLRmenu? (s=Si/n=No/[Enter]=No) => \c"
+         read vSalirMenu       
+         vSalirMenu=$(echo ${vSalirMenu}| tr "[:upper:]" "[:lower:]")
+         if [ "$vSalirMenu" = "s" ]; then 
+            echo 
+            exit
+         else
+            echo
+         fi 
+      fi
+  fi
+################################################################################
+# FIN IPR 1039: Actualizacion Menu, adecuacion salir	                       #
+# EEVN 							                       #
+################################################################################
+
+
+
+#   if [ "${vOpcion}" = "" ]; then
+#      # Vuelve a mostrar el menu
+#     vFlgOpcErr="N"
+#   fi
+
+   # PROCESO DE CLEARING
+
+######################################################################################
+## IPR 1039:  Proceso de Clearing Verificando que Las Preliquidaciones esten Correctas
+## 17/02/2012 DCB
+######################################################################################
+   echo " "
+   vCLRLIQERR=N
+   v_arch_preliq
+   if [ "${vOpcion}" = "55" ] && [ "$vCLRLIQERR" = "N" ]; then
+##########################################################################################
+## Fin IPR 1039:  Proceso de Clearing Verificando que Las Preliquidaciones esten Correctas
+## 17/02/2012 DCB
+##########################################################################################
+
+      vFlgOpcErr="N"
+      vOpcion=""
+
+      # Confirmacion de Ejecucion
+      if [ "${vOpcRepro}" = "S" ]; then
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE REPROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg " El REPROCESO puede involucrar la ejecucion de acciones adicionales para" N S
+         f_msg " realizar correctamente la REVERSION de la ejecucion anterior, por lo que" N S
+         f_msg " puede ser NECESARIA una AUTORIZACION por parte del ADMINISTRADOR DEL SISTEMA." N S
+      else
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+      fi
+      f_msg
+      f_msg "         Proceso: CLEARING" N S
+      f_fechora $vFecSes
+      f_msg " Fecha de Sesion: $vpValRet" N S
+      f_msg "  Hora de Cierre: $vHCierre hrs." N S
+      f_msg
+      echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+      read ValConf
+      f_msg
+
+      if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         vFileLOG="$vFileLOGCLR.`date '+%Y%m%d%H%M%S'`.LOG"
+         if [ -f "$vFileLOG" ]; then
+            rm -f $vFileLOG
+         fi
+         touch $vFileLOG
+         echo
+         echo "              Archivo de Control : `basename ${vFileCTL}`"
+         echo "                      Directorio : `dirname ${vFileCTL}`"
+         echo "        Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+         echo "                      Directorio : `dirname ${vFileLOG}`"
+         echo "         Archivo LOG del Proceso : `basename ${vFileLOGCLR}.LOG`"
+         echo "                      Directorio : `dirname ${vFileLOGCLR}.LOG`"
+         nohup $HOME/bin/SGCPCLR.sh $vFecSes $vCodHCierre CLR $vOpcRepro S 1>$vFileLOG 2>&1 &
+         trap "trap '' 2" 2
+         tail -f $vFileLOG
+         trap ""
+      fi
+
+   fi # Proceso de Clearing
+
+######################################################################################
+## IPR 1039:  Proceso de Clearing Verificando que Las Preliquidaciones esten Correctas
+## 17/02/2012 DCB
+######################################################################################
+  if [ "${vOpcion}" = 55 ] && [ "$vCLRLIQERR" = "S" ]
+  then
+     echo "\nLos Siguientes Archivos No existen o No estan Procesados Correctamente:\n"
+     for vArchivoMalo in $vARCHERR
+     do
+         echo `basename $vArchivoMalo`
+     done
+     vFlgOpcErr="S"
+  fi
+##########################################################################################
+## Fin IPR 1039:  Proceso de Clearing Verificando que Las Preliquidaciones esten Correctas
+## 17/02/2012 DCB
+##########################################################################################
+
+######################################################################################
+## IPR 1039:  Proceso de Clearing Eventual
+##            Sin Verificar que Las Preliquidaciones esten Correctas
+## 17/02/2012 DCB
+######################################################################################
+   # PROCESO DE CLEARING EVENTUAL
+
+   if [ "${vOpcion}" = "98" ] ; then
+
+      vFlgOpcErr="N"
+      vOpcion=""
+      echo "* * * * * * * * * * * * * * * *  ADVERTENCIA * * * * * * * * * * * * * * * * * * * *"
+      echo "* ESTE PROCESO SOLO SE DEBE DE EJECUTAR EN CIRCUMSTANCIAS ESPECIALES YA QUE NO SE  *"
+      echo "* VERIFICO QUE LOS PROCESOS DE PRE-LIQUIDACION TERMINARAN CORRECTAMENTE            *"
+      echo "* * * * * * * * * * * * * * * *  ADVERTENCIA * * * * * * * * * * * * * * * * * * * *"
+
+      # Confirmacion de Ejecucion
+      if [ "${vOpcRepro}" = "S" ]; then
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE REPROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg " El REPROCESO puede involucrar la ejecucion de acciones adicionales para" N S
+         f_msg " realizar correctamente la REVERSION de la ejecucion anterior, por lo que" N S
+         f_msg " puede ser NECESARIA una AUTORIZACION por parte del ADMINISTRADOR DEL SISTEMA." N S
+      else
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+      fi
+      f_msg
+      f_msg "         Proceso: CLEARING" N S
+      f_fechora $vFecSes
+      f_msg " Fecha de Sesion: $vpValRet" N S
+      f_msg "  Hora de Cierre: $vHCierre hrs." N S
+      f_msg
+      echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+      read ValConf
+      f_msg
+
+      if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]; then
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         echo "Inicio del Proceso de Clearing"
+         echo "Hora de Cierre $vHCierre"
+         echo "Fecha de Sesion $vFecSes"
+         echo "Fecha de Abono $vFecAbo"
+         vFileLOG="$vFileLOGCLR.`date '+%Y%m%d%H%M%S'`.LOG"
+         if [ -f "$vFileLOG" ]; then
+            rm -f $vFileLOG
+         fi
+         touch $vFileLOG
+         echo
+         echo "              Archivo de Control : `basename ${vFileCTL}`"
+         echo "                      Directorio : `dirname ${vFileCTL}`"
+         echo "        Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+         echo "                      Directorio : `dirname ${vFileLOG}`"
+         echo "         Archivo LOG del Proceso : `basename ${vFileLOGCLR}.LOG`"
+         echo "                      Directorio : `dirname ${vFileLOGCLR}.LOG`"
+         nohup $HOME/bin/SGCPCLR.sh $vFecSes $vCodHCierre CLR $vOpcRepro S 1>$vFileLOG 2>&1 &
+         trap "trap '' 2" 2
+         tail -f $vFileLOG
+         trap ""
+      fi
+
+   fi # Proceso de Clearing
+
+######################################################################################
+## Fin IPR 1039:  Proceso de Clearing Eventual
+##            Sin Verificar que Las Preliquidaciones esten Correctas
+## 17/02/2012 DCB
+######################################################################################
+   # CUADRE DEL PROCESO DE CLEARING
+
+   if [ "$vOpcion" = "2" ]; then
+
+      vFlgOpcErr="S"
+      echo
+      echo "   [ 1] Reporte de Cuadre de Clearing del Banco Provincial"
+      echo "   [ 2] Reporte de Cuadre de Clearing del Banco Mercantil"
+      echo "   [ Q] Regresar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcRpt
+      if [ "$vOpcRpt" = "q" ] || [ "$vOpcRpt" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcRpt" = "1" ]; then  # Reporte de Cuadre de Clearing del Banco Provincial
+         vFlgOpcErr="N"
+         vOpcion="2"
+         f_admCTL R
+         case $vEstCLR in
+              0) echo
+                 f_fhmsg "El Proceso de Clearing aun no ha sido ejecutado."
+                 echo
+                 echo "... presione [ENTER] para regresar."
+                 read vContinua;;
+              P) echo
+                 f_fhmsg "Proceso de Clearing en Ejecucion."
+                 echo
+                 echo "... presione [ENTER] para regresar."
+                 read vContinua;;
+              *) echo
+                 if [ -f "$DIROUT/CLRBP${vFecSes}${vCodHCierre}.RPT" ]; then
+                    cat $DIROUT/CLRBP${vFecSes}${vCodHCierre}.RPT
+                 else
+                    echo "Archivo de Reporte <CLRBP${vFecSes}${vCodHCierre}.RPT> NO ENCONTRADO."
+                 fi
+                 echo
+                 echo "... presione [ENTER] para regresar."
+                 read vContinua;;
+         esac
+      fi # Reporte de Cuadre de Clearing del Banco Provincial
+
+      if [ "$vOpcRpt" = "2" ]; then  # Reporte de Cuadre de Clearing del Banco Mercantil
+         vFlgOpcErr="N"
+         vOpcion="2"
+         f_admCTL R
+         case $vEstCLR in
+              0) echo
+                 f_fhmsg "El Proceso de Clearing aun no ha sido ejecutado."
+                 echo
+                 echo "... presione [ENTER] para regresar."
+                 read vContinua;;
+              P) echo
+                 f_fhmsg "Proceso de Clearing en Ejecucion."
+                 echo
+                 echo "... presione [ENTER] para regresar."
+                 read vContinua;;
+              *) echo
+                 if [ -f "$DIROUT/CLRBM${vFecSes}${vCodHCierre}.RPT" ]; then
+                    cat $DIROUT/CLRBM${vFecSes}${vCodHCierre}.RPT
+                 else
+                    echo "Archivo de Reporte <CLRBM${vFecSes}${vCodHCierre}.RPT> NO ENCONTRADO."
+                 fi
+                 echo
+                 echo "... presione [ENTER] para regresar."
+                 read vContinua;;
+         esac
+      fi # Reporte de Cuadre de Clearing del Banco Mercantil
+
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="2"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+   fi # Cuadre del Proceso de Clearing
+
+
+   # LOG DE PROCESOS
+
+   if [ "$vOpcion" = "3" ]; then
+
+      vFlgOpcErr="S"
+      echo
+      echo "   [ 1] LOG del Proceso de Clearing"
+      #echo "   [ 2] LOG del Proceso de Outgoing"
+      #echo "   [ 2] LOG de la Interfaz de Liquidacion"
+      echo "   [ Q] Regresar"
+      echo
+      echo "   Seleccione Opcion => \c"
+      read vOpcLog
+      if [ "$vOpcLog" = "q" ] || [ "$vOpcLog" = "Q" ]; then
+         vOpcion=""
+         vFlgOpcErr="N"
+      fi
+
+      if [ "$vOpcLog" = "1" ]; then  # LOG del Proceso de Clearing
+         vOpcion="3"
+         vFlgOpcErr="N"
+         f_admCTL R
+         case $vEstCLR in
+              0) echo
+                 f_fhmsg "El Proceso de Clearing aun no ha sido ejecutado."
+                 echo
+                 echo "... presione [ENTER] para regresar."
+                 read vContinua;;
+              P) echo
+                 f_fhmsg "Proceso de Clearing en Ejecucion... [CTRL+C para salir del LOG]"
+                 echo
+                 trap "trap '' 2" 2
+                 tail -f $vFileLOGCLR.LOG
+                 trap "";;
+              *) echo
+                 f_msg "Archivo LOG: $vFileLOGCLR.LOG"
+                 echo
+                 cat $vFileLOGCLR.LOG
+                 echo "... presione [ENTER] para regresar."
+                 read vContinua;;
+         esac
+      fi # LOG del Proceso de Clearing
+
+      if [ "$vFlgOpcErr" = "S" ]; then
+         vOpcion="3"
+         echo
+         f_msg "${dpNom} - Opcion Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+      vFlgOpcErr="N"
+
+   fi # LOG del Proceso de Outgoing
+
+
+   # FECHA DE SESION
+
+   if [ "$vOpcion" = "4" ]; then
+
+      vFlgOpcErr="N"
+      vOpcion=""
+
+      echo
+      echo " Fecha de Sesion (Formato: AAAAMMDD,[Enter]=SYSDATE-1) => \c"
+      read vModFecSes
+
+      if [ "$vModFecSes" = "" ]; then
+
+         vFecSes=`getdate -1`
+         vFileCTL="$DIRDAT/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+      else
+         ValFecha.sh $vModFecSes
+         vRet=$?
+         if [ "$vRet" = "0" ]; then
+            # Confirmacion si la fecha de sesion es igual o mayor a la actual
+            vFecSys="`getdate`"
+            vFlgModFec="S"
+            if [ "$vModFecSes" -ge "$vFecSys" ]; then
+               vFlgModFec="N"
+               echo
+               echo "--------------------------------------------------------------------------------"
+               echo " CONFIRMACION DE CAMBIO DE FECHA DE SESION"
+               echo "--------------------------------------------------------------------------------"
+               echo
+               echo " La Fecha de Sesion ingresada es igual o mayor a la fecha actual."
+               echo
+               echo " Desea Continuar? (S=Si/N=No/[Enter]=No) => \c"
+               read vConf
+               if [ "$vConf" = "S" ] || [ "$vConf" = "s" ]; then
+                  vFlgModFec="S"
+               fi
+            fi
+            if [ "$vFlgModFec" = "S" ]; then
+               vFecSes=$vModFecSes
+               vFileCTL="$DIRDAT/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+            fi
+         else
+            echo
+            f_fhmsg "La Fecha de Sesion Ingresada es Incorrecta."
+            echo
+            echo "... presione [ENTER] para continuar."
+            read vContinua
+         fi
+      fi
+   fi  # Opcion 8 - Fecha de Sesion
+
+
+   # OPCION DE REPROCESO
+
+   if [ "$vOpcion" = "5" ]; then
+
+      vFlgOpcErr="N"
+      vOpcion=""
+
+      echo
+      if [ "$vOpcRepro" = "N" ]; then
+         echo " Desea ACTIVAR la Opcion de Reproceso? (S=Si/N=No/[Enter]=NO) => \c"
+      else
+         echo " Desea DESACTIVAR la Opcion de Reproceso? (S=Si/N=No/[Enter]=NO) => \c"
+      fi
+      read vSelOpcRepro
+
+      if [ "$vSelOpcRepro" = "" ]; then
+         vSelOpcRepro="N"
+      elif [ "$vSelOpcRepro" = "s" ]; then
+           vSelOpcRepro="S"
+      elif [ "$vSelOpcRepro" = "n" ]; then
+           vSelOpcRepro="N"
+      fi
+
+      if [ "$vSelOpcRepro" = "S" ]; then
+           if [ "$vOpcRepro" = "N" ]; then
+              vOpcRepro="S"
+           else
+              vOpcRepro="N"
+           fi
+      else
+         if [ "$vSelOpcRepro" != "N" ]; then
+            echo
+            f_fhmsg "Opcion Incorrecta."
+            echo
+            echo "... presione [ENTER] para continuar."
+            read vContinua
+         fi
+      fi
+
+   fi  # Opcion 9 - Opcion de Reproceso
+
+   # HORA DE CIERRE
+
+   if [ "$vOpcion" = "0" ]; then
+
+      vFlgOpcErr="N"
+      vOpcion=""
+
+      echo
+      echo " [1] Cierre de las ${vHCierre1} hrs."
+      echo " [2] Cierre de las ${vHCierre2} hrs."
+      echo
+      echo " Seleccione la Hora de Cierre ([Enter]=${vHCierre1} hrs.) => \c"
+      read vSelHCierre
+
+      if [ "$vSelHCierre" = "" ]; then
+         vCodHCierre="1"
+#         f_getFECHA
+         vFileCTL="$DIRDAT/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+      elif [ "$vSelHCierre" = "1" ]; then
+           vCodHCierre=$vSelHCierre
+#           f_getFECHA
+           vFileCTL="$DIRDAT/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+      elif [ "$vSelHCierre" = "2" ]; then
+           vCodHCierre=$vSelHCierre
+#           f_getFECHA
+           vFileCTL="$DIRDAT/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+      else
+         echo
+         f_fhmsg "Hora de Cierre Incorrecta."
+         echo
+         echo "... presione [ENTER] para continuar."
+         read vContinua
+      fi
+
+   fi  # Opcion 0 - Hora de Cierre
+###########################################################################################
+#Opcion 1 Proceso Automatico de Clearing, Liquidacion, Outgoing, Cierre de Liquidacion
+#e ISLR
+###########################################################################################
+if [ "${vOpcion}" = 1 ] && [ "$vCLRLIQERR" = "S" ]
+then
+	echo "\nLos Siguientes Archivos No existen o No estan Procesados Correctamente:\n"
+	for vArchivoMalo in $vARCHERR
+	do
+		echo `basename $vArchivoMalo`
+	done
+	vFlgOpcErr="S"
+fi
+if [ "${vOpcion}" = 99 ]
+then
+   echo "* * * * * * * * * * * * * * * *  ADVERTENCIA * * * * * * * * * * * * * * * * * * * *"
+   echo "* ESTE PROCESO SOLO SE DEBE DE EJECUTAR EN CIRCUMSTANCIAS ESPECIALES YA QUE NO SE  *"
+   echo "* VERIFICO QUE LOS PROCESOS DE PRE-LIQUIDACION TERMINARAN CORRECTAMENTE            *"
+   echo "* * * * * * * * * * * * * * * *  ADVERTENCIA * * * * * * * * * * * * * * * * * * * *"
+fi
+
+
+
+if [ "${vOpcion}" = 1 ] && [ "$vCLRLIQERR" = "N" ] || [ "${vOpcion}" = 99 ]
+then
+      vFlgOpcErr="N"
+      vOpcion=""
+      vAutoLog="${DIRLOG}/TSTLOG${vFecSes}.${vCodHCierre}.`date '+%Y%m%d%H%M%S'`.LOG"
+      if [ "${vFRepro}" = "S" ]
+      then
+           vOpcRepro=S
+      fi
+
+      # Confirmacion de Ejecucion
+      if [ "${vOpcRepro}" = "S" ]
+      then
+         f_msg
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE REPROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         f_msg " El REPROCESO puede involucrar la ejecucion de acciones adicionales para" N S
+         f_msg " realizar correctamente la REVERSION de la ejecucion anterior, por lo que" N S
+         f_msg " puede ser NECESARIA una AUTORIZACION por parte del ADMINISTRADOR DEL SISTEMA." N S
+      else
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg " CONFIRMACION DE EJECUCION DE PROCESO" N S
+         f_msg "--------------------------------------------------------------------------------" N S
+      fi
+      f_msg
+      f_msg "         Proceso: Cierre Automatico" N S
+      f_fechora $vFecSes
+      f_msg " Fecha de Sesion: $vpValRet" N S
+      f_msg "  Hora de Cierre: $vHCierre hrs." N S
+      f_msg
+      f_msg " El log maestro del proceso automatico estara en el archivo:" N S
+      f_msg " $vAutoLog" N S
+      f_msg
+      f_msg "el cual podra ser consultado en caso de que la sesion finalize a destiempo" N S
+      f_msg
+      echo " Desea Continuar? (S=Si/N=No/Enter=No) => \c"
+      read ValConf
+      if [ "$ValConf" = "s" ] || [ "$ValConf" = "S" ]
+      then
+          vPRELIQEJEC=`ps -ef | grep SGCPCLRLOADcron.sh | grep -v grep | wc -l`
+          case $vCodHCierre in
+             1)
+                vHULTPRELIQ=21;;
+             2)
+                vHULTPRELIQ=1;;
+          esac
+          if [ "$vPRELIQEJEC" -gt "0" ]
+          then
+             vHORAPRELIQ=`ps -ef | grep SGCPCLRLOADcron.sh | grep -v grep | awk -F' ' '{ print $5 }' | cut -f1 -d:`
+             vPIDPRELIQ=`ps -ef | grep SGCPCLRLOADcron.sh  | grep -v grep | awk -F' ' '{ print $2 }'`
+             if [ "$VHORAPRELIQ" -le "$vHULTPRELIQ" ]
+             then
+               wait $vPIDPRELIQ
+             fi
+          fi
+          vTSTUSER=`whoami`
+         trap '' 0 1 3 15 24
+         trap salida 2
+         stty intr 
+         f_msg "--------------------------------------------------------------------------------" N S
+         f_msg
+         vFileLOG="$vFileLOGCLR.`date '+%Y%m%d%H%M%S'`.LOG"
+         if [ -f "$vFileLOG" ]; then
+            rm -f $vFileLOG
+         fi
+         touch $vFileLOG
+         echo "Inicio del Cierre Automatico" | tee -a $vAutoLog
+         vFileCTL="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+	 f_admCTL R
+         if [ "$vEstCLR" = "F" ] && [ "${vOpcRepro}" != "S" ]
+         then
+            tput setf 8
+            echo "***************************************************************************" | tee -a $vAutoLog
+            echo "Error, el Clearing de este periodo ya fue efectuado" | tee -a $vAutoLog
+            echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+            echo "Debera reiniciarse con la opcion de Reproceso Activada" | tee -a $vAutoLog
+            echo "***************************************************************************" | tee -a $vAutoLog
+            tput setf 7
+            trap - 0 1 2 3 15 24
+            sqlplus -s $DB @$DIRBIN/alertaciep CIE CLEARING "Clearing_ya_efectuado"
+            exit 1
+         fi
+         #################################################
+         # PROCESO DE CLEARING - proceso automatico paso 1
+         #################################################
+         nohup $HOME/bin/SGCPCLR.sh $vFecSes $vCodHCierre CLR $vOpcRepro S 1>$vFileLOG 2>&1 &
+         BGPID=$!
+         echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+         echo "Se inicio el proceso de Clearing, Numero de Proceso: $BGPID" | tee -a $vAutoLog
+         echo "Log: $vFileLOG" | tee -a $vAutoLog
+         echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+         wait $BGPID
+         vFileCTL="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+	 f_admCTL R
+         if [ "$vEstCLR" != "F" ]
+         then
+            tput setf 8
+            echo "***************************************************************************" | tee -a $vAutoLog
+            echo "El Proceso de Clearing Finalizo CON ERRORES" | tee -a $vAutoLog
+            echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+            echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+            echo "Debera reiniciarse con la opcion de Reproceso Activada" | tee -a $vAutoLog
+            echo "***************************************************************************" | tee -a $vAutoLog
+            tput setf 7
+            exit 1
+         else
+            echo "***************************************************************************" | tee -a $vAutoLog
+            echo "Proceso de Clearing Finalizo EXITOSAMENTE" | tee -a $vAutoLog
+            echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+            echo "***************************************************************************" | tee -a $vAutoLog
+            echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+            echo "Copiando Archivos de Clearing al area de" | tee -a $vAutoLog
+            echo "Acceso de los Bancos" | tee -a $vAutoLog
+            echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+            vDIRSRC="${DIROUT}"
+            vFileParSSH="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SSH"
+            vSSHERROR=0
+            ADQUIRIENTES="BM BP"
+            for pCodEntAdq in $ADQUIRIENTES
+            do
+              vDIRTGT="${pCodEntAdq}pu_fileout"
+              case $pCodEntAdq in
+                BM)
+                  vCodBanco=0105;;
+                BP)
+                  vCodBanco=0108;;
+              esac
+              vArchBanco="CLCO02${vCodBanco}${vFecSes}${vCodHCierre}.DAT"
+              if [ ! -s $vDIRSRC/$vArchBanco ]
+              then
+                 tput setf 8
+                 echo "***************************************************************************" | tee -a $vAutoLog
+                 echo "El Archivo de Clearing del Adquiriente $vCodBanco" | tee -a $vAutoLog
+                 echo "Archivo: $vDIRSRC/$vArchBanco" | tee -a $vAutoLog
+                 echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                 echo "Esto Indica una falla no detectada en el Proceso de Clearing" | tee -a $vAutoLog
+                 echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                 echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+                 echo "Debera reiniciarse con la opcion de Reproceso Activada" | tee -a $vAutoLog
+                 echo "***************************************************************************" | tee -a $vAutoLog
+                 tput setf 7
+                 sqlplus -s $DB @$DIRBIN/alertaciep CIE CLEARING "Clearing_Archivo_$vArchBanco_No_Existe_o_Vacio"
+                 exit 1
+              fi 
+              scp -B -q $vDIRSRC/$vArchBanco ${SSSH_USER}@${FTP_HOSTXCOM}:${vDIRTGT}/${vArchBanco}.FTP 2>&1 | tee -a $vAutoLog
+              vSSHStat=$?
+              if [ "$vSSHStat" != "0" ]
+              then
+                 vSSHERROR=1
+              fi
+              ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "chmod 644 $vDIRTGT/$vArchBanco.FTP" 2> $vFileParSSH
+              ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "mv $vDIRTGT/$vArchBanco.FTP $vDIRTGT/$vArchBanco" 2>> $vFileParSSH
+              vSSHStat=$?
+              if [ "$vSSHStat" != "0" ]
+              then
+                 vSSHERROR=1
+                 cat $vFileParSSH >> $vAutoLog
+              fi
+            done
+            if [ "$vSSHERROR" = "0" ]
+            then
+               echo "***************************************************************************" | tee -a $vAutoLog
+               echo "Copia de Archivos de Clearing" | tee -a $vAutoLog
+               echo "al area de Acceso de los Bancos Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+               echo "***************************************************************************" | tee -a $vAutoLog
+               rm $vFileParSSH
+            else
+               tput setf 8
+               echo "***************************************************************************" | tee -a $vAutoLog
+               echo "Copia de Archivos de Clearing" | tee -a $vAutoLog
+               echo "al area de Acceso de los Bancos Finalizada EN ERROR" | tee -a $vAutoLog
+               echo "***************************************************************************" | tee -a $vAutoLog
+               tput setf 7
+               sqlplus -s $DB @$DIRBIN/alertacie CIE TCLEARING "Transferencia_de_Archivos_de_Clearing_Fallida"
+            fi
+         fi
+        ####################################################################
+        # INICIA PROCESO Liquidacion de BP y BM  - proceso automatico paso 2
+        ####################################################################
+        ERRORCIE=0
+        vADQUIDX=0
+        vOUTSTART=0
+        vCIESTART=0
+        vNOCIERRE=0
+        unset STATLIQ
+        ADQUIRIENTES="BM BP"
+        vpFH=`date '+%Y%m%d%H%M%S'`
+        if [ "$vFRepro" = "S" ]
+        then
+           vTipoProc="RT"
+        else
+           vTipoProc="PN"
+        fi
+        for pCodEntAdq in $ADQUIRIENTES
+        do
+            vFileLOG="${DIRLOG}/SGCPLIQ${pCodEntAdq}${vFecAbo}.${vCodHCierre}.RT.${vpFH}.LOG"
+            vFileCTL="${DIRDAT}/SGCPLIQ${pCodEntAdq}${vFecAbo}.${vCodHCierre}.CTL"
+            vSTATLIQ=`awk '{print substr($0,15,1)}' $vFileCTL 2> /dev/null` 
+            if [ "$vSTATLIQ" = "F" ] && [ "$vFRepro" != "S" ]
+            then
+               tput setf 8
+               echo "***************************************************************************" | tee -a $vAutoLog
+               echo "Error, el Proceso de Liquidacion para el Adquiriente $pCodEntAdq de este periodo ya fue efectuado" | tee -a $vAutoLog
+               echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+               echo "***************************************************************************" | tee -a $vAutoLog
+               tput setf 7
+               sqlplus -s $DB @$DIRBIN/alertaciep CIE LIQUIDACION "Liquidacion_Adquiriente_${pCodEntAdq}_ya_efectuada"
+               trap - 0 1 2 3 15 24
+               stty intr 
+               kill -9 $(jobs -p) > /dev/null 2>&1
+               exit 1
+            fi
+            # PROCESO LIQUIDACION
+            nohup $DIRBIN/SGCPLIQADQ.sh $pCodEntAdq $vFecAbo $vFecSes $vCodHCierre $vTipoProc S 1>$vFileLOG 2>&1 &
+            BGPID=$!
+            case $pCodEntAdq in
+               BM)
+                  PIDLIQBM=$BGPID;;
+               BP)
+                  PIDLIQBP=$BGPID;;
+            esac
+            echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+            echo "Se inicio el Proceso de Liquidacion para el Adquiriente $pCodEntAdq" | tee -a $vAutoLog
+            echo "Numero de Proceso: $BGPID" | tee -a $vAutoLog
+            echo "Log: $vFileLOG" | tee -a $vAutoLog
+            echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+#            until [ -s $vFileCTL ]
+#            do
+#              sleep 10
+#            done
+            vPROCLIQ=`ps -fu $vTSTUSER | grep -v "ps -f" | grep $BGPID | grep SGCPLIQADQ.sh | wc -l`
+            vPROCLIQ=`printf "%d" "$vPROCLIQ"`
+            vSTATLIQ=`awk '{print substr($0,15,1)}' $vFileCTL 2>/dev/null` 
+#            echo "vFileCTL = $vFileCTL, vSTATLIQ = $vSTATLIQ" | tee -a $vAutoLog
+##            if [ "$vSTATLIQ" = "0" ]
+#            if [ "$vPROCLIQ" = "0" ]
+#            then
+#              tput setf 8
+#              echo "***************************************************************************" | tee -a $vAutoLog
+#              echo "Error de Consistencia, el proceso de Liquidacion del Adquiriente $pCodEntAdq no arranco" | tee -a $vAutoLog
+#              echo "***************************************************************************" | tee -a $vAutoLog
+#              tput setf 7
+#              sqlplus -s $DB @$DIRBIN/alertaciep LIQ LIQUIDACION "Error_de_Consistencia_en_Proceso_de_Liquidaciones_Bancos"
+#              kill -9 $(jobs -p) > /dev/null 2>&1
+#              trap - 0 1 2 3 15 24
+#              stty intr 
+#              exit 1
+#            else
+               STATLIQ[$vADQUIDX]="0"
+##               echo "Longitud de STATLIQ=${#STATLIQ[*]} vADQUIDX=$vADQUIDX" | tee -a $vAutoLog
+               vADQUIDX=`expr $vADQUIDX + 1`
+#            fi
+        done
+        vPROCCIELIQ=4
+        CONTADORPASE=1
+        while true
+        do
+#           echo "En el Loop Infinito" | tee -a $vAutoLog
+           for pCodEntAdq in $ADQUIRIENTES
+           do
+#                echo "En el Loop de Adqurientes, $pCodEntAdq" | tee -a $vAutoLog
+                case $pCodEntAdq in
+                   BM)
+                       vADQUIDX=0
+                       vCodBanco=0105;;
+                   BP)
+                       vADQUIDX=1
+                       vCodBanco=0108;;
+                esac
+                if [ "${STATLIQ[$vADQUIDX]}" = "1" ]
+                then
+                   continue
+                fi
+                vFileCTL="${DIRDAT}/SGCPLIQ${pCodEntAdq}${vFecAbo}.${vCodHCierre}.CTL"
+                vSTATLIQ=`awk '{print substr($0,15,1)}' $vFileCTL 2>/dev/null` 
+                if [ "$vSTATLIQ" = "E" ]
+                then
+                   vFileLOG="${DIRLOG}/SGCPLIQ${pCodEntAdq}${vFecAbo}.${vCodHCierre}.RT.${vpFH}.LOG"
+                   tput setf 8
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   echo "Error, el Proceso de Liquidacion del Adquiriente $pCodEntAdq Finalizo CON ERRORES" | tee -a $vAutoLog
+                   echo "revisar el Log: $vFileLOG" | tee -a $vAutoLog
+                   echo "NO SE EFECTUARA el Cierre de Liquidaciones" | tee -a $vAutoLog
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   tput setf 7
+                   STATLIQ[$vADQUIDX]=1
+                   ERRORCIE=1
+                   sqlplus -s $DB @$DIRBIN/alertaciep LIQ LIQUIDACION "No_Se_Efectuara_Cierre_de_Liquidaciones"
+                fi
+                if [ "$vSTATLIQ" = "F" ] && [ "${STATLIQ[$vADQUIDX]}" = "0" ]
+                then
+                   vFileLOG="${DIRLOG}/SGCPLIQ${pCodEntAdq}${vFecAbo}.${vCodHCierre}.RT.${vpFH}.LOG"
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   echo "el Proceso de Liquidacion del Adquiriente $pCodEntAdq Finalizo EXITOSAMENTE" | tee -a $vAutoLog
+                   echo "revisar el Log: $vFileLOG" | tee -a $vAutoLog
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   STATLIQ[$vADQUIDX]=1
+                   case $pCodEntAdq in
+                     BM)
+                        wait $PIDLIQBM;;
+                     BP)
+                        wait $PIDLIQBP;;
+                   esac
+                   echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                   echo "Verificando y Copiando Archivos de Liquidacion del Adquiriente $pCodEntAdq al area de" | tee -a $vAutoLog
+                   echo "Acceso de los Bancos" | tee -a $vAutoLog
+                   echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                   vDIRSRC="${DIROUT}"
+                   vDIRTGT="${pCodEntAdq}pu_fileout"
+                   vFileParSSH="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SSH"
+                   vSSHERROR=0
+                   vARCHILIQADQOK=0
+                   for vPrefijo in ABO MOV MFR ABOMB
+                   do
+                      if [ "$vCodHCierre" = "1" ]
+                      then
+                         vArchBanco="${vPrefijo}${vCodBanco}${vFecSes}${vCodHCierre}.DAT"
+                      else
+                         vArchBanco="${vPrefijo}${vCodBanco}${vFecAbo}${vCodHCierre}.DAT"
+                      fi
+                      if [ ! -s $vDIRSRC/$vArchBanco ]
+                      then
+                         vARCHILIQADQOK=1
+                         vSSHERROR=1
+                         vFileLOG="${DIRLOG}/SGCPLIQ${pCodEntAdq}${vFecAbo}.${vCodHCierre}.RT.${vpFH}.LOG"
+                         tput setf 8
+                         echo "***************************************************************************" | tee -a $vAutoLog
+                         echo "El Archivo de tipo $vPrefijo del Adquiriente $vCodBanco" | tee -a $vAutoLog
+                         echo "Archivo: $vDIRSRC/$vArchBanco"
+                         echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                         echo "Esto Indica una falla no detectada en el Proceso de Liquidacion de Adquirientes" | tee -a $vAutoLog
+                         echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                         echo "NO se efectuara el cierre de Liquidaciones" | tee -a $vAutoLog
+                         echo "***************************************************************************" | tee -a $vAutoLog
+                         tput setf 7
+                         sqlplus -s $DB @$DIRBIN/alertacie LIQ LIQUIDACION "Liquidacion_de_Adquirientes_Archivo_$vArchBanco_No_Existe_o_Vacio"
+                         ERRORCIE=1
+                      fi 
+                   done
+                   for vPrefijo in ABO MOV MFR ABOMB
+                   do
+                      if [ "$vCodHCierre" = "1" ]
+                      then
+                         vArchBanco="${vPrefijo}${vCodBanco}${vFecSes}${vCodHCierre}.DAT"
+                      else
+                         vArchBanco="${vPrefijo}${vCodBanco}${vFecAbo}${vCodHCierre}.DAT"
+                      fi
+                      if [ "$vPrefijo" = "MOV" ]
+                      then
+                         echo "Verificando Archivo de Movimientos $vArchBanco" | tee -a $vAutoLog
+                         vENCABEZADO=`head -1 $vDIRSRC/$vArchBanco`
+                         vNREG=`echo $vENCABEZADO | awk '{print substr($0,11,10)}'`
+                         vNREG=`echo "$vNREG + 0" | bc`
+                         vMONTOENCR=`echo $vENCABEZADO | awk '{print substr($0,21,17)}'`
+                         vMONTOENC=`echo "scale=2;$vMONTOENCR/100" | bc`
+                         vMONTOENC=`printf "%.2f" $vMONTOENC`
+#                         vSALIDA=`awk 'BEGIN{MONTOTOT=0} { if (NR>1) {SIGNO=substr($0,555,1);MONTO=substr($0,556,12);if (SIGNO=="C") {MONTOTOT=MONTOTOT+MONTO} else {MONTOTOT=MONTOTOT-MONTO}}} END{printf "%.2f:%d\n",MONTOTOT/100,NR-1}' $vDIRSRC/$vArchBanco`
+                         vSALIDA=`awk 'BEGIN{MONTOTOT=0} { if (NR>1) {SIGNO=substr($0,555,1);MONTO=substr($0,556,12);MONTO2=substr($0,46,12);if (MONTO == MONTO2) { if (SIGNO=="C") {MONTOTOT=MONTOTOT+MONTO} else {MONTOTOT=MONTOTOT-MONTO}} else { if (SIGNO=="C") {MONTOTOT=MONTOTOT+MONTO2} else {MONTOTOT=MONTOTOT-MONTO2}}}} END{printf "%.2f:%d\n",MONTOTOT/100,NR-1}' $vDIRSRC/$vArchBanco`
+                         vMONTOTOT=`echo $vSALIDA | cut -f1 -d:`
+                         vTOTREG=`echo $vSALIDA | cut -f2 -d:`
+                         vDiferencia=`expr $vNREG - $vTOTREG`
+                         if [ "$vNREG" != "$vTOTREG" ]
+                         then
+                            tput setf 8
+                            echo "Transacciones con Error:" > $DIRTMP/transerr$vCodBanco
+                            echo "------------------------" >> $DIRTMP/transerr$vCodBanco
+                            awk '{ if (NR>1) {ID=substr($0,2,15);MONTO=substr($0,556,12);MONTO2=substr($0,46,12); if ( MONTO != MONTO2 ) { printf "%d\n",ID }}}' $vDIRSRC/$vArchBanco >> $DIRTMP/transerr$vCodBanco
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            echo "Error, el Archivo $vArchBanco tiene problemas de consistencia" | tee -a $vAutoLog
+                            echo "el encabezado indica $vNREG registros y en realidad tiene $vTOTREG Registros" | tee -a $vAutoLog
+                            echo "Diferencia: $vDiferencia" | tee -a $vAutoLog
+                            echo "NO se efectuara el cierre de Liquidaciones" | tee -a $vAutoLog
+                            cat $DIRTMP/transerr$vCodBanco
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            tput setf 7
+                            sqlplus -s $DB @$DIRBIN/alertaciep LIQ LIQUIDACION "Liquidacion_de_Adquirientes_Archivo_$vArchBanco_Diferencia_de_Registros:_${vDiferencia}"
+                           vARCHILIQADQOK=1
+                           vSSHERROR=1
+                           ERRORCIE=1
+                         elif [ "$vMONTOENC" != "$vMONTOTOT" ]
+                            then
+                            vDiferencia=`echo "scale=2;$vMONTOENC - $vMONTOTOT" | bc`
+                            tput setf 8
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            echo "Error, el Archivo $vArchBanco tiene problemas de consistencia" | tee -a $vAutoLog
+                            echo "el encabezado indica un monto total de $vMONTOENC y en realidad el Monto es $vMONTOTOT" | tee -a $vAutoLog
+                            echo "Differencia: $vDiferencia" | tee -a $vAutoLog
+                            echo "NO se efectuara el cierre de Liquidaciones" | tee -a $vAutoLog
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            tput setf 7
+                            sqlplus -s $DB @$DIRBIN/alertaciep LIQ LIQUIDACION "Liquidacion_de_Adquirientes_Archivo_$vArchBanco_Diferencia_de_Monto:_$vDiferencia"
+                           vARCHILIQADQOK=1
+                           vSSHERROR=1
+                           ERRORCIE=1
+                         else
+                            echo "Archivo $vArchBanco verificado correctamente" | tee -a $vAutoLog
+                         fi
+                      fi
+                      if [ "$vPrefijo" = "ABO" ] || [ "$vPrefijo" = "ABOMB" ]
+                      then
+                         echo "Verificando Archivo de Abonos $vArchBanco" | tee -a $vAutoLog
+                         vENCABEZADO=`head -1 $vDIRSRC/$vArchBanco`
+                         vFOOTER=`tail -1 $vDIRSRC/$vArchBanco`
+                         vNREG=`echo $vENCABEZADO | awk '{print substr($0,14,7)}'`
+                         vNREG=`echo "$vNREG + 0" | bc`
+                         vNREGF=`echo $vFOOTER | awk '{print substr($0,2,7)}'`
+                         vNREGF=`echo "$vNREGF + 0" | bc`
+                         vTOTREG=`sed -e '1d' -e '$d' $vDIRSRC/$vArchBanco | wc -l`
+                         vTOTREG=`echo "$vTOTREG + 0" | bc`
+                         vTOTREGR=`echo "$vTOTREG + 2" | bc`
+                         vMONTOENCR=`echo $vENCABEZADO | awk '{print substr($0,22,18)}'`
+                         vMONTOENC=`echo "scale=2;$vMONTOENCR/100" | bc`
+                         vMONTOENC=`printf "%.2f" $vMONTOENC`
+                         vMONTOTOT=`/usr/xpg4/bin/awk -v "TOTREG=$vTOTREGR" 'BEGIN{MONTOTOT=0} { if ( NR > 1 && NR < TOTREG ) {SIGNO=substr($0,10,1);MONTO=substr($0,61,17);sub("-","",MONTO);if (SIGNO=="1") {MONTOTOT=MONTOTOT+MONTO} else {MONTOTOT=MONTOTOT-MONTO}}} END{printf "%.2f\n",MONTOTOT/100}' $vDIRSRC/$vArchBanco`
+                         if [ "$vNREG" != "$vTOTREG" ]
+                         then
+                            vDiferencia=`expr $vNREG - $vTOTREG`
+                            tput setf 8
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            echo "Error, el Archivo $vArchBanco tiene problemas de consistencia" | tee -a $vAutoLog
+                            echo "el encabezado indica $vNREG registros y en realidad tiene $vTOTREG Registros" | tee -a $vAutoLog
+                            echo "Diferencia: $vDiferencia" | tee -a $vAutoLog
+                            echo "NO se efectuara el cierre de Liquidaciones" | tee -a $vAutoLog
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            tput setf 7
+                            sqlplus -s $DB @$DIRBIN/alertaciep LIQ LIQUIDACION "Liquidacion_de_Adquirientes_Archivo_$vArchBanco_Diferencia_de_Registros:_${vDiferencia}"
+                           vARCHILIQADQOK=1
+                           vSSHERROR=1
+                           ERRORCIE=1
+                         elif [ "$vNREG" != "$vNREGF" ]
+                         then
+                            vDiferencia=`expr $vNREG - $vNREGF`
+                            tput setf 8
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            echo "Error, el Archivo $vArchBanco tiene problemas de consistencia" | tee -a $vAutoLog
+                            echo "el encabezado indica $vNREG registros y el Fin de Archivo Indica  $vTOTREG Registros" | tee -a $vAutoLog
+                            echo "Diferencia: $vDiferencia" | tee -a $vAutoLog
+                            echo "NO se efectuara el cierre de Liquidaciones" | tee -a $vAutoLog
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            tput setf 7
+                            sqlplus -s $DB @$DIRBIN/alertaciep LIQ LIQUIDACION "Liquidacion_de_Adquirientes_Archivo_$vArchBanco_Diferencia_de_Registros:_${vDiferencia}"
+                           vARCHILIQADQOK=1
+                           vSSHERROR=1
+                           ERRORCIE=1
+                         elif [ "$vMONTOENC" != "$vMONTOTOT" ]
+                            then
+                            vDiferencia=`echo "scale=2;$vMONTOENC - $vMONTOTOT" | bc`
+                            tput setf 8
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            echo "Error, el Archivo $vArchBanco tiene problemas de consistencia" | tee -a $vAutoLog
+                            echo "el encabezado indica un monto total de $vMONTOENC y en realidad el Monto es $vMONTOTOT" | tee -a $vAutoLog
+                            echo "Diferencia: $vDiferencia" | tee -a $vAutoLog
+                            echo "NO se efectuara el cierre de Liquidaciones" | tee -a $vAutoLog
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            tput setf 7
+                            sqlplus -s $DB @$DIRBIN/alertaciep LIQ LIQUIDACION "Liquidacion_de_Adquirientes_Archivo_$vArchBanco_Diferencia_de_Monto:_$vDiferencia"
+                           vARCHILIQADQOK=1
+                           vSSHERROR=1
+                           ERRORCIE=1
+                         else
+                            echo "Archivo $vArchBanco verificado correctamente" | tee -a $vAutoLog
+                         fi
+                      fi
+                      if [ "$vPrefijo" = "ABO" ]
+                      then
+                         if [ "$vCodHCierre" = "1" ]
+                         then
+                            vArchBancoMOV="MOV${vCodBanco}${vFecSes}${vCodHCierre}.DAT"
+                         else
+                            vArchBancoMOV="MOV${vCodBanco}${vFecAbo}${vCodHCierre}.DAT"
+                         fi
+                         echo "Verificando Archivo de Abonos $vArchBanco contra Archivo de Movimientos $vArchBancoMOV" | tee -a $vAutoLog
+                         vTOTREGABO=`cat $vDIRSRC/$vArchBanco | wc -l`
+                         vMONTOABOTOT=`/usr/xpg4/bin/awk -v "TOTREG=$vTOTREGABO" 'BEGIN{MONTOTOT=0} { if ( NR > 1 && NR < TOTREG  && substr($0,268,2) != "00" && substr($0,268,2) != "08" && substr($0,268,2) != "60" && substr($0,268,2) != "65" && substr($0,268,2) != "68" && substr($0,268,2) != "69" && substr($0,268,2) != "70" && substr($0,268,2) != "71" ) {SIGNO=substr($0,10,1);MONTO=substr($0,104,17);sub("-","",MONTO);if (SIGNO=="1") {MONTOTOT=MONTOTOT+MONTO} else {MONTOTOT=MONTOTOT-MONTO}}} END{printf "%.2f\n",MONTOTOT/100}' $vDIRSRC/$vArchBanco`
+                         vMONTOMOVTOT=`awk 'BEGIN{MONTOTOT=0} { if (NR>1 && substr($0,527,1) != "a") {SIGNO=substr($0,555,1);MONTO=substr($0,556,12);if (SIGNO=="C") {MONTOTOT=MONTOTOT+MONTO} else {MONTOTOT=MONTOTOT-MONTO}}} END{printf "%.2f",MONTOTOT/100}' $vDIRSRC/$vArchBancoMOV`
+                        if [ "$vMONTOABOTOT" != "$vMONTOMOVTOT" ]
+                        then
+                            vDiferencia=`echo "scale=2;$vMONTOABOTOT - $vMONTOMOVTOT" | bc`
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            echo "Error de Cuadre entre " | tee -a $vAutoLog
+                            echo "El Archivo de Abonos $vArchBanco " | tee -a $vAutoLog
+                            echo "y El Archivo de Movimientos $vArchBancoMOV " | tee -a $vAutoLog
+                            echo "El Monto de Transacciones en $vArchBanco es $vMONTOABOTOT" | tee -a $vAutoLog
+                            echo "El Monto de Transacciones en $vArchBancoMOV es $vMONTOMOVTOT" | tee -a $vAutoLog
+                            echo "Diferencia: $vDiferencia" | tee -a $vAutoLog
+                            echo "NO se efectuara el cierre de Liquidaciones" | tee -a $vAutoLog
+                            echo "***************************************************************************" | tee -a $vAutoLog
+                            tput setf 7
+                            sqlplus -s $DB @$DIRBIN/alertaciep LIQ LIQUIDACION "Liquidacion_de_Adquirientes_Archivo_${vArchBanco}_Archivo_${vArchBancoMOV}_Diferencia_de_Montos:_${vDiferencia}"
+                           vARCHILIQADQOK=1
+                           vSSHERROR=1
+                           ERRORCIE=1
+                        else
+                            echo "Archivo ${vArchBanco} verificado correctamente contra ${vArchBancoMOV}" | tee -a $vAutoLog
+                        fi
+                      fi
+                      if [ "$vARCHILIQADQOK" = "0" ]
+                      then
+                         scp -B -q $vDIRSRC/$vArchBanco ${SSSH_USER}@${FTP_HOSTXCOM}:${vDIRTGT}/${vArchBanco}.FTP 2>&1 | tee -a $vAutoLog
+                         vSSHStat=$?
+                         if [ "$vSSHStat" != "0" ]
+                         then
+                            vSSHERROR=1
+                         fi
+                         ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "chmod 644 $vDIRTGT/$vArchBanco.FTP" 2> $vFileParSSH
+                         ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "mv $vDIRTGT/$vArchBanco.FTP $vDIRTGT/$vArchBanco" 2>> $vFileParSSH
+                         vSSHStat=$?
+                         if [ "$vSSHStat" != "0" ]
+                         then
+                            vSSHERROR=1
+                            cat $vFileParSSH >> $vAutoLog
+                         fi
+                      fi
+                   done
+                   if [ "$vSSHERROR" = "0" ]
+                   then
+                      echo "***************************************************************************" | tee -a $vAutoLog
+                      echo "Copia de Archivos de Liquidacion del Adquiriente $pCodEntAdq" | tee -a $vAutoLog
+                      echo "al area de Acceso de los Bancos Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                      echo "***************************************************************************" | tee -a $vAutoLog
+                      rm $vFileParSSH
+                   else
+                      tput setf 8
+                      echo "***************************************************************************" | tee -a $vAutoLog
+                      echo "Copia de Archivos de Liquidacion del Adquiriente $pCodEntAdq" | tee -a $vAutoLog
+                      echo "al area de Acceso de los Bancos Finalizada EN ERROR" | tee -a $vAutoLog
+                      echo "***************************************************************************" | tee -a $vAutoLog
+                      tput setf 7
+                      sqlplus -s $DB @$DIRBIN/alertaciep CIE TLIQUIDACION "Transferencia_de_Archivos_de_Liquidacion_Fallida"
+                   fi
+                   
+                fi
+#                echo "vOUTSTART=$vOUTSTART" | tee -a $vAutoLog
+         #############################################################################################
+         # PROCESO Outgoing VISA (Cierre 2) o MASTER (Cierre 1)" - proceso automatico NAIGUATA paso 3A
+         #############################################################################################
+                if [ "${STATLIQ[$vADQUIDX]}" = "1" ] && [ "$vOUTSTART" = "0" ]
+                then
+                  #Arrancar Outgoing Naiguata VISA  (Cierre 2) 
+                  vFileCTL_NG="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+                  if [ "$vFRepro" = "S" ]
+                  then
+                     pOpcRepro="S"
+                  fi
+                  if [ "$vCodHCierre" = 2 ]
+                  then
+                    vFileLOG="${DIRLOG}/SGCPCLROUTVISA_NGTA${vFecSes}.${vCodHCierre}.LOG"
+                    vFileCTL2=$vFileCTL
+                    vFileCTL=$vFileCTL_NG
+                    f_admCTL R
+                    if [ "$vEstOUTVISA_NGTA" = "F" ] && [ "$vFRepro" != "S" ]
+                    then
+                       tput setf 8
+                       echo "***************************************************************************" | tee -a $vAutoLog
+                       echo "Error, el Proceso de NAIGUATA VISA de este periodo ya fue efectuado" | tee -a $vAutoLog
+                       echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+                       echo "***************************************************************************" | tee -a $vAutoLog
+                       tput setf 7
+                       sqlplus -s $DB @$DIRBIN/alertaciep VISA OUTVINGTA "Outgoing_NAIGUATA_VISA_ya_Efectuado"
+                       kill -9 $(jobs -p) > /dev/null 2>&1
+                       trap - 0 1 2 3 15 24
+                       stty intr 
+                       exit 1
+#                    else
+#                       vFileCTL1=$vFileCTL
+#                       vFileCTL=$vFileCTL2
+                    fi
+                    nohup ${DIRBIN}/SGCPCLR.sh ${vFecSes} ${vCodHCierre} OUTVISANG ${pOpcRepro} S 1>${vFileLOG} 2>&1 &
+                    BGPID=$!
+                    PIDOUTVING=$BGPID
+                    echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                    echo "Se inicio el proceso de Outgoing de NAIGUATA VISA" | tee -a $vAutoLog
+                    echo "Numero de Proceso: $BGPID" | tee -a $vAutolog
+                    echo "Log: $vFileLOG" | tee -a $vAutoLog
+                    echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                  else
+#                    echo "Arrancar Outgoing de Naiguata MasterCard (Cierre 2)"
+                    vFileLOG="${DIRLOG}/SGCPCLROUTMC_NGTA${vFecSes}.${vCodHCierre}.LOG"
+                    vSTARTMC_NG=$DIRTMP/STARTMC_NG
+                    touch $vSTARTMC_NG
+                    vFileCTL2=$vFileCTL
+                    vFileCTL=$vFileCTL_NG
+                    f_admCTL R
+                    if [ "$vEstOUTMC_NGTA" = "F" ] && [ "$vFRepro" != "S" ]
+                    then
+                       tput setf 8
+                       echo "***************************************************************************" | tee -a $vAutoLog
+                       echo "Error, el Proceso de NAIGUATA MASTERCARD (Cierre 1) de este periodo ya fue efectuado" | tee -a $vAutoLog
+                       echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+                       echo "***************************************************************************" | tee -a $vAutoLog
+                       tput setf 7
+                       sqlplus -s $DB @$DIRBIN/alertaciep MASTERCARD OUTMCNGTA "Outgoing_NAIGUATA_MASTERCARD_ya_Efectuado"
+                       kill -9 $(jobs -p) > /dev/null 2>&1
+                       trap - 0 1 2 3 15 24
+                       stty intr 
+                       exit 1
+#                    else
+#                       vFileCTL1=$vFileCTL
+#                       vFileCTL=$vFileCTL2
+                    fi
+                    nohup ${DIRBIN}/SGCPCLR.sh ${vFecSes} ${vCodHCierre} OUTMCNG ${pOpcRepro} S 1>${vFileLOG} 2>&1 &
+                    BGPID=$!
+                    PIDOUTMCNG=$BGPID
+                    echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                    echo "Se inicio el proceso de Outgoing de NAIGUATA MASTERCARD (Cierre 1)" | tee -a $vAutoLog
+                    echo "numero de Proceso: $BGPID" | tee -a $vAutoLog
+                    echo "Log: $vFileLOG" | tee -a $vAutoLog
+                    echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                  fi
+                  ##vOUTSTART=1
+                fi
+
+         ####################################################################################
+         # PROCESO Outgoing VISA (Cierre 2) o MASTER (Cierre 1)" - proceso automatico paso 3B
+         ####################################################################################
+                if [ "${STATLIQ[$vADQUIDX]}" = "1" ] && [ "$vOUTSTART" = "0" ]
+                then
+#                  echo "Arrancar Outgoing VISA (Cierre 2) o MASTER (Cierre 1)" | tee -a $vAutoLog
+                  vFileCTL1="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+                  if [ "$vFRepro" = "S" ]
+                  then
+                     pOpcRepro="S"
+                  fi
+                  if [ "$vCodHCierre" = 2 ]
+                  then
+                    vFileLOG="${DIRLOG}/SGCPCLROUTVISA${vFecSes}.${vCodHCierre}.LOG"
+                    vFileCTL2=$vFileCTL
+                    vFileCTL=$vFileCTL1
+                    f_admCTL R
+                    if [ "$vEstOUTVISA" = "F" ] && [ "$vFRepro" != "S" ]
+                    then
+                       tput setf 8
+                       echo "***************************************************************************" | tee -a $vAutoLog
+                       echo "Error, el Proceso de VISA de este periodo ya fue efectuado" | tee -a $vAutoLog
+                       echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+                       echo "***************************************************************************" | tee -a $vAutoLog
+                       tput setf 7
+                       sqlplus -s $DB @$DIRBIN/alertaciep VISA OUTVI "Outgoing_VISA_ya_Efectuado"
+                       kill -9 $(jobs -p) > /dev/null 2>&1
+                       trap - 0 1 2 3 15 24
+                       stty intr 
+                       exit 1
+#                    else
+#                       vFileCTL1=$vFileCTL
+#                       vFileCTL=$vFileCTL2
+                    fi
+                    nohup ${DIRBIN}/SGCPCLR.sh ${vFecSes} ${vCodHCierre} OUTVISA ${pOpcRepro} S 1>${vFileLOG} 2>&1 &
+                    BGPID=$!
+                    PIDOUTVI=$BGPID
+                    echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                    echo "Se inicio el proceso de Outgoing de VISA" | tee -a $vAutoLog
+                    echo "Numero de Proceso: $BGPID" | tee -a $vAutolog
+                    echo "Log: $vFileLOG" | tee -a $vAutoLog
+                    echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                  else
+#                    echo "Arrancar Outgoing de MasterCard (Cierre 2)"
+                    vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+                    vSTARTMC=$DIRTMP/STARTMC
+                    touch $vSTARTMC
+                    vFileCTL2=$vFileCTL
+                    vFileCTL=$vFileCTL1
+                    f_admCTL R
+                    if [ "$vEstOUTMC" = "F" ] && [ "$vFRepro" != "S" ]
+                    then
+                       tput setf 8
+                       echo "***************************************************************************" | tee -a $vAutoLog
+                       echo "Error, el Proceso de MASTERCARD (Cierre 1) de este periodo ya fue efectuado" | tee -a $vAutoLog
+                       echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+                       echo "***************************************************************************" | tee -a $vAutoLog
+                       tput setf 7
+                       sqlplus -s $DB @$DIRBIN/alertaciep MASTERCARD OUTMC "Outgoing_MASTERCARD_ya_Efectuado"
+                       kill -9 $(jobs -p) > /dev/null 2>&1
+                       trap - 0 1 2 3 15 24
+                       stty intr 
+                       exit 1
+#                    else
+#                       vFileCTL1=$vFileCTL
+#                       vFileCTL=$vFileCTL2
+                    fi
+                    nohup ${DIRBIN}/SGCPCLR.sh ${vFecSes} ${vCodHCierre} OUTMC ${pOpcRepro} S 1>${vFileLOG} 2>&1 &
+                    BGPID=$!
+                    PIDOUTMC=$BGPID
+                    echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                    echo "Se inicio el proceso de Outgoing de MASTERCARD (Cierre 1)" | tee -a $vAutoLog
+                    echo "numero de Proceso: $BGPID" | tee -a $vAutoLog
+                    echo "Log: $vFileLOG" | tee -a $vAutoLog
+                    echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                  fi
+                  vOUTSTART=1
+                fi
+           done
+           vADQUIDXC=0
+           vTOTLIQLISTA=0
+           for vADQUIDXC in ${STATLIQ[@]}
+           do
+#             echo "En el Loop de Revision de Resultados de Proceso $vADQUIDXC" | tee -a $vAutoLog
+             if [ "$vADQUIDXC" = "1" ]
+             then
+                vTOTLIQLISTA=`expr $vTOTLIQLISTA + 1`
+             fi
+           done
+           if [ "$vCodHCierre" = "2" ] && [ "$vOUTSTART" = "1" ]
+           then
+           # Revisar Outgoing (VISA en Cierre 2 o MasterCard en Cierre 1)" 
+             vFileCTL2=$vFileCTL
+             vFileCTL=$vFileCTL1
+             f_admCTL R
+             if [ "$vEstOUTVISA" = "F" ]
+             then
+               vFileLOG="${DIRLOG}/SGCPCLROUTVISA${vFecSes}.${vCodHCierre}.LOG"
+               echo "***************************************************************************" | tee -a $vAutoLog
+               echo "el Proceso de OutGoing de VISA Finalizo EXITOSAMENTE" | tee -a $vAutoLog
+               echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+               echo "***************************************************************************" | tee -a $vAutoLog
+               vOUTSTART=2
+               vFileCTL1=$vFileCTL
+               vFileCTL=$vFileCTL2
+               wait $PIDOUTVI
+               echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+               echo "Copiando Archivos de VISA al Servidor de EDITPACK" | tee -a $vAutoLog
+               echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+               vSSHERROR=0
+               vSSHStat=0
+               vSSELOGSZ=0
+               vFHsys=`date '+%Y%m%d%H%M%S'`
+               vFileParSFTP="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SFTP"
+               vFileBatSFTP="${DIRTMP}/${dpNom}_${vFHsys}.BAT.SFTP"
+               vFecSesCorta=`echo $vFecSes | awk '{ print substr($0,3) }'`
+               for vEndPoint in 0105 0108
+               do
+                  vARCHVI=`ls -t ${DIROUT}/OUTVI${vEndPoint}${vFecSes}.DAT 2>/dev/null | wc -l`
+                  vARCHVI=`printf "%d" "$vARCHVI"`
+                  if [ "$vARCHVI" = "0" ]
+                  then
+                     vFileLOG="${DIRLOG}/SGCPCLROUTVISA${vFecSes}.${vCodHCierre}.LOG"
+                     tput setf 8
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     echo "El Archivo de Outgoing de VISA del Adquiriente $vEndPoint" | tee -a $vAutoLog
+                     echo "Archivo: $DIROUT/OUTVI$vEndPoint$vFecSes.DAT" | tee -a $vAutoLog
+                     echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                     echo "Esto Indica una falla no detectada en el Proceso de Outgoing de VISA" | tee -a $vAutoLog
+                     echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     tput setf 7
+                     sqlplus -s $DB @$DIRBIN/alertacie VISA OUTVI "Outgoing_VISA_Archivo_OUTVI$vEndPoint$vFecSes.DAT_No_Existe_o_Vacio"
+                     vSSHERROR=1
+                     vEstOUTVISA="E"
+                  fi
+                  vRUTAWIN=/OUTGOING
+                  if [ "$vEstOUTVISA" = "F" ]
+                  then
+                     case $vEndPoint in
+                       0105)
+#                           vRUTAWIN=/OU443979
+                           vEndPointADQ=BM
+                           ;;
+                       0108)
+#                           vRUTAWIN=/OU443978
+                           vEndPointADQ=BP
+                           ;;
+                     esac
+#                     echo "mkdir ${vRUTAWIN}/OU${vFecSesCorta}" >> $vFileBatSFTP
+                     for vARCHVI in `ls -t ${DIROUT}/OUTVI${vEndPoint}${vFecSes}.DAT`
+                     do
+                        vARCHVIDEST="OUTVIS${vEndPointADQ}${vFecSesCorta}.CTF"
+                        unix2dos -ascii -437 $vARCHVI $DIROUT/$vARCHVIDEST
+#                        echo "put $DIROUT/$vARCHVIDEST ${vRUTAWIN}/OU${vFecSesCorta}/${vARCHVIDEST}"  >> $vFileBatSFTP
+                        echo "put $DIROUT/$vARCHVIDEST ${vRUTAWIN}/${vARCHVIDEST}"  >> $vFileBatSFTP
+                     done
+                     sftp -b $vFileBatSFTP ${SFTP_USER}@${SFTP_VISA} > $vFileParSFTP 2>&1
+                     vSSHStat=$?
+                     vSSHELOGSZ=`/usr/xpg4/bin/grep -v -e mkdir -e put -e Uploading -e sftp -e Connecting $vFileParSFTP | wc -l`
+                     if [ "$vSSHStat" != "0" ] || [ "$vSSHELOGSZ" -gt "0" ]
+                     then
+                        vSSHERROR=1
+                        cat $vFileParSFTP | tee -a $vAutoLog
+                     fi
+                     rm $vFileBatSFTP
+                     rm $vFileParSFTP
+                  fi
+               done
+               if [ "$vSSHERROR" = "0" ]
+               then
+
+				  #GLOBALR 27/01/2015 IPR 1148 - Transferencia de Archivos del Outgoing a los bancos
+				  SGCFTPOutgoingAdq.sh ${vFecSes} BM VI ${vCodHCierre} ${vFecAbo} #1>$vAutoLog 2>&1 &
+				  SGCFTPOutgoingAdq.sh ${vFecSes} BP VI ${vCodHCierre} ${vFecAbo} #1>$vAutoLog 2>&1 			   
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  echo "Copia de Archivos de VISA" | tee -a $vAutoLog
+                  echo "Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                  echo "Ejecutar Proceso de Validacion en EDITPACK" | tee -a $vAutoLog
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  echo "Archivos de Outgoing de VISA Transferidos al Servidor de EDITPACK, favor efectuar su validacion y transferencia" | mailx -c "$vMAILRECC" -s "Outgoing VISA" $vMAILREC
+               else
+                  tput setf 8
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  echo "Copia de Archivos de VISA" | tee -a $vAutoLog
+                  echo "Finalizada EN ERROR" | tee -a $vAutoLog
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  tput setf 7
+                   sqlplus -s $DB @$DIRBIN/alertacie VISA TOUTVI "Transferencia_Outgoing_VISA_Fallida"
+#                  echo "Error en la Transferencia de Archivos de Outgoing de VISA , revisar el log: $vAutoLog" | mailx -c "$vMAILRECC" -s "Error Transferencia Outgoing VISA" $vMAILREC
+               fi
+             elif [ "$vEstOUTVISA" = "E" ]
+             then
+               vFileLOG="${DIRLOG}/SGCPCLROUTVISA${vFecSes}.${vCodHCierre}.LOG"
+               tput setf 8
+               echo "***************************************************************************" | tee -a $vAutoLog
+               echo "Error, el Proceso de OutGoing de VISA Finalizo CON ERRORES" | tee -a $vAutoLog
+               echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+               echo "***************************************************************************" | tee -a $vAutoLog
+               tput setf 7
+               vOUTSTART=2
+               vFileCTL1=$vFileCTL
+               vFileCTL=$vFileCTL2
+             fi
+             if [ "$vEstOUTVISA" = "F" ] || [ "$vEstOUTVISA" = "E" ]
+             then
+                vFileCTL1="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+                vOpcRepro="S"
+                vFileLOG="${DIRLOG}/SGCPCLROUTPRICE${vFecSes}.${vCodHCierre}.`date '+%Y%m%d%H%M%S'`.LOG"
+                vFileLOGPRICE=$vFileLOG
+                 vFileCTL2=$vFileCTL
+                 vFileCTL=$vFileCTL1
+                 f_admCTL R
+                 if [ "$vEstOUTPRICE" = "F" ] && [ "$vFRepro" != "S" ]
+                 then
+                     tput setf 8
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     echo "Error, el Proceso de PRICE de este periodo ya fue efectuado" | tee -a $vAutoLog
+                     echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     tput setf 7
+                     sqlplus -s $DB @$DIRBIN/alertaciep PRICE OUTPR "Outgoing_PRICE_ya_Efectuado"
+                     kill -9 $(jobs -p) > /dev/null 2>&1
+                     trap - 0 1 2 3 15 24
+                     stty intr 
+                     exit 1
+                 else
+                     vFileCTL1=$vFileCTL
+                     vFileCTL=$vFileCTL2
+                 fi
+                nohup ${DIRBIN}/SGCPCLR.sh ${vFecSes} ${vCodHCierre} OUTPRICE ${pOpcRepro} S 1>${vFileLOG} 2>&1 &
+                BGPID=$!
+                PIDOUTPR=$BGPID
+                echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                echo "Se inicio el proceso de Outgoing de PRICE" | tee -a $vAutoLog
+                echo "Numero de Proceso: $BGPID" | tee -a $vAutoLog
+                echo "Log: $vFileLOG" | tee -a $vAutoLog
+                echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                vOUTSTART=3
+             fi
+           elif [ "$vCodHCierre" = "1" ] && [ "$vOUTSTART" = "1" ]
+           then
+              vFileCTL2=$vFileCTL
+              vFileCTL=$vFileCTL1
+              f_admCTL R
+             if [ "$vEstOUTMC" = "F" ]
+             then
+               vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+               echo "***************************************************************************" | tee -a $vAutoLog
+               echo "el Proceso de OutGoing de MASTERCARD (Cierre 1) Finalizo EXITOSAMENTE" | tee -a $vAutoLog
+               echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+               echo "***************************************************************************" | tee -a $vAutoLog
+#               date | tee -a $vAutoLog
+               wait $PIDOUTMC
+#               date | tee -a $vAutoLog
+               vOUTSTART=6
+               vFileCTL1=$vFileCTL
+               vFileCTL=$vFileCTL2
+               echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+               echo "Copiando Archivos IPM de MasterCard al Servidor de PRE-EDIT" | tee -a $vAutoLog
+               echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+               vSSHERROR=0
+               vSSHELOGSZ=0
+               vSSHStat=0
+               case $COD_AMBIENTE in
+                  DESA)
+                    vTipoBulk="R119";;
+                  CCAL)
+                    vTipoBulk="R119";;
+                  PROD)
+                    vTipoBulk="R111";;
+               esac
+               if [ "$vCodHCierre" = "1" ]
+               then 
+                 vFecJul="`dayofyear ${vFecSes}`"
+               else
+                 vFecJul="`dayofyear ${vFecAbo}`"
+               fi
+               vFecJul=`printf "%03d" $vFecJul`
+               vFHsys=`date '+%Y%m%d%H%M%S'`
+               vFileParSFTP="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SFTP"
+               vFileBatSFTP="${DIRTMP}/${dpNom}_${vFHsys}.BAT.SFTP"
+               vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+               for vEndPoint in 01857 01858
+               do
+                  case $vEndPoint in
+                     01858)
+                        vRUTAWIN="$PSFTP_MC/0070193_BP";;
+                     01857)
+                        vRUTAWIN="$PSFTP_MC/0071049_BM";;
+                  esac
+                  vARCHMC=`ls ${DIROUT}/${vTipoBulk}${vEndPoint}${vFecJul}[0-2][0-9].IPM 2>/dev/null | wc -l`
+                  vARCHMC=`printf "%d" "$vARCHMC"`
+                  if [ "$vARCHMC" = "0" ]
+                  then
+                     vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+                     tput setf 8
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     echo `date` | tee -a $vAutoLog
+                     echo "El Archivo de Outgoing de Master Card del Adquiriente $vEndPoint" | tee -a $vAutoLog
+                     echo "Archivo cuyo nombre empieza con: $DIROUT/$vTipoBulk$vEndPoint$vFecJul" | tee -a $vAutoLog
+#                     echo "Archivo $vARCHMC" | tee -a $vAutoLog
+                     echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                     echo "Esto Indica una falla no detectada en el Proceso de Outgoing de Master Card" | tee -a $vAutoLog
+                     echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     tput setf 7
+                     sqlplus -s $DB @$DIRBIN/alertacie MC OUTMC "Outgoing_MasterCard_Archivo_$vTipoBulk$vEndPoint$vFecJul_No_Existe_o_Vacio"
+                     vSSHERROR=1
+#                     vEstOUTMC="E"
+                     continue
+                  fi
+                  if [ "$vEstOUTMC" = "F" ] && [ "$vARCHMC" -gt "0" ]
+                  then
+                     for vARCHMC in `ls -t ${DIROUT}/${vTipoBulk}${vEndPoint}${vFecJul}[0-2][0-9].IPM`
+                     do
+                        if [ "$vARCHMC" -nt "$vSTARTMC" ]
+                        then
+                           vARCHMCD=$vARCHMC.CONV
+#                           unix2dos -ascii -437 $vARCHMC $vARCHMCD
+#                           mv $vARCHMCD $vARCHMC
+                           echo "put $vARCHMC ${vRUTAWIN}"  >> $vFileBatSFTP
+                        fi
+                     done
+                     sftp -b $vFileBatSFTP ${SFTP_USER}@${SFTP_MC} > $vFileParSFTP 2>&1
+                     vSSHStat=$?
+                     vSSHELOGSZ=`/usr/xpg4/bin/grep -v -e mkdir -e put -e Uploading -e sftp -e Connecting $vFileParSFTP | wc -l`
+                     if [ "$vSSHStat" != "0" ] || [ "$vSSHELOGSZ" -gt "0" ]
+                     then
+                        vSSHERROR=1
+                        cat $vFileParSFTP | tee -a $vAutoLog
+                     fi
+                  else
+                     vSSHERROR=1
+                  fi
+               done
+				#GLOBALR - IPR 1148 - Se saca del for todo el bloque de la condicion   if [ "$vSSHERROR" = "0" ]
+				if [ "$vSSHERROR" = "0" ]
+               then
+				  #GLOBALR 27/01/2015 IPR 1148 - Transferencia de Archivos del Outgoing a los bancos
+				   SGCFTPOutgoingAdq.sh ${vFecSes} BM MC ${vCodHCierre} ${vFecAbo}
+				   SGCFTPOutgoingAdq.sh ${vFecSes} BP MC ${vCodHCierre} ${vFecAbo}			  
+				fi
+			   
+               if [ "$vSSHERROR" = "0" ]
+               then
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  echo "Copia de Archivos de Mastercard" | tee -a $vAutoLog
+                  echo "Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                  echo "Ejecutar Proceso de Validacion en PRE-EDIT" | tee -a $vAutoLog
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  echo "Archivos de Outgoing de MasterCard Transferidos al Servidor de PRE-EDIT, favor efectuar su validacion y transferencia" | mailx -c "$vMAILRECC" -s "Outgoing Master Card" $vMAILREC
+               rm $vFileBatSFTP
+               rm $vFileParSFTP
+               else
+                  tput setf 8
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  echo "Copia de Archivos de Mastercard" | tee -a $vAutoLog
+                  echo "Finalizada EN ERROR" | tee -a $vAutoLog
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  tput setf 7
+#                  echo "Error en la Transferencia de Archivos de Outgoing de MasterCard , revisar el log: $vAutoLog" | mailx -c "$vMAILRECC" -s "Error Transferencia Outgoing MasterCard" $vMAILREC
+                   sqlplus -s $DB @$DIRBIN/alertacie MC TOUTMC "Transferencia_Outgoing_MasterCard_Fallida"
+               fi
+             elif [ "$vEstOUTMC" = "E" ]
+             then
+               vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+               tput setf 8
+               echo "***************************************************************************" | tee -a $vAutoLog
+               echo "Error, el Proceso de OutGoing de MASTERCARD (Cierre 1) Finalizo CON ERRORES" | tee -a $vAutoLog
+               echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+               echo "***************************************************************************" | tee -a $vAutoLog
+               tput setf 7
+               vOUTSTART=6
+               vFileCTL1=$vFileCTL
+               vFileCTL=$vFileCTL2
+             fi
+          fi
+           if [ "$vCodHCierre" = "2" ] && [ "$vOUTSTART" = "3" ]
+           then
+              vFileCTL2=$vFileCTL
+              vFileCTL=$vFileCTL1
+              f_admCTL R
+              if [ "$vEstOUTPRICE" = "F" ]
+              then
+                vFileLOG=$vFileLOGPRICE
+#                vFileLOG="${DIRLOG}/SGCPCLROUTPRICE${vFecSes}.${vCodHCierre}.`date '+%Y%m%d%H%M%S'`.LOG"
+                echo "***************************************************************************" | tee -a $vAutoLog
+                echo "el Proceso de OutGoing de PRICE Finalizo EXITOSAMENTE" | tee -a $vAutoLog
+                echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+                echo "***************************************************************************" | tee -a $vAutoLog
+                vOUTSTART=4
+                wait $PIDOUTPR
+                echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                echo "Copiando Archivos de Outgoing de PRICE al area de" | tee -a $vAutoLog
+                echo "Acceso de los Bancos" | tee -a $vAutoLog
+                echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                vDIRSRC="${DIROUT}"
+                vFileParSSH="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SSH"
+                vSSHERROR=0
+                ADQUIRIENTES="BM BP"
+                for pCodEntAdq in $ADQUIRIENTES
+                do
+                  vDIRTGT="${pCodEntAdq}pu_fileout"
+                  case $pCodEntAdq in
+                    BM)
+                      vCodBanco=0105;;
+                    BP)
+                      vCodBanco=0108;;
+                  esac
+                  vArchBanco="LE${vCodBanco}${vFecSes}.DAT"
+                  if [ ! -s $vDIRSRC/$vArchBanco ]
+                  then
+                     vFileLOG="${DIRLOG}/SGCPCLROUTPRICE${vFecSes}.${vCodHCierre}.`date '+%Y%m%d%H%M%S'`.LOG"
+                     tput setf 8
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     echo "El Archivo de Outgoing de PRICE del Adquiriente $vCodBanco" | tee -a $vAutoLog
+                     echo "Archivo: $vDIRSRC/$vArchBanco" | tee -a $vAutoLog
+                     echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                     echo "Esto Indica una falla no detectada en el Proceso de OUTGOING de PRICE" | tee -a $vAutoLog
+                     echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     tput setf 7
+                     sqlplus -s $DB @$DIRBIN/alertacie PR OUTPR "OUTGOING_de_PRICE_Archivo_$vArchBanco_No_Existe_o_Vacio"
+                     vEstOUTPRICE="E" 
+                  fi 
+                  if [ "$vEstOUTPRICE" = "F" ]
+                  then
+                     scp -B -q $vDIRSRC/$vArchBanco ${SSSH_USER}@${FTP_HOSTXCOM}:${vDIRTGT}/${vArchBanco}.FTP 2>&1 | tee -a $vAutoLog
+                     vSSHStat=$?
+                     if [ "$vSSHStat" != "0" ]
+                     then
+                        vSSHERROR=1
+                     fi
+                     ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "chmod 644 $vDIRTGT/$vArchBanco.FTP" 2> $vFileParSSH
+                     ssh  -o "BatchMode=yes" ${SSSH_USER}@${FTP_HOSTXCOM} "mv $vDIRTGT/$vArchBanco.FTP $vDIRTGT/$vArchBanco" 2>> $vFileParSSH
+                     vSSHStat=$?
+                     if [ "$vSSHStat" != "0" ]
+                     then
+                        vSSHERROR=1
+                        cat $vFileParSSH >> $vAutoLog
+                     fi
+                  fi
+                done
+                if [ "$vSSHERROR" = "0" ]
+                then
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   echo "Copia de Archivos de Outgoing de PRICE" | tee -a $vAutoLog
+                   echo "al area de Acceso de los Bancos Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   rm $vFileParSSH
+                else
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   echo "Copia de Archivos de Outgoing de PRICE" | tee -a $vAutoLog
+                   echo "al area de Acceso de los Bancos Finalizada EN ERROR" | tee -a $vAutoLog
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   sqlplus -s $DB @$DIRBIN/alertacie PR TOUTPR "Transferencia_de_OUTGOING_de_PRICE_Fallida"
+                fi
+              elif [ "$vEstOUTPRICE" = "E" ]
+              then
+                vFileLOG=$vFileLOGPRICE
+#                vFileLOG="${DIRLOG}/SGCPCLROUTPRICE${vFecSes}.${vCodHCierre}.`date '+%Y%m%d%H%M%S'`.LOG"
+                echo "***************************************************************************" | tee -a $vAutoLog
+                echo "Error, el Proceso de OutGoing de PRICE Finalizo CON ERRORES" | tee -a $vAutoLog
+                echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+                echo "***************************************************************************" | tee -a $vAutoLog
+                vOUTSTART=4
+              fi
+              if [ "$vEstOUTPRICE" = "F" ] || [ "$vEstOUTPRICE" = "E" ]
+              then
+                 vFileCTL2=$vFileCTL
+                 vFileCTL=$vFileCTL1
+                 f_admCTL R
+                 if [ "$vEstOUTMC" = "F" ] && [ "$vFRepro" != "S" ]
+                 then
+                     tput setf 8
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     echo "Error, el Proceso de MASTERCARD (Cierre 2) de este periodo ya fue efectuado" | tee -a $vAutoLog
+                     echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     tput setf 7
+                     sqlplus -s $DB @$DIRBIN/alertaciep MASTERCARD OUTMC "Outgoing_MASTERCARD_ya_Efectuado"
+                     kill -9 $(jobs -p) > /dev/null 2>&1
+                     trap - 0 1 2 3 15 24
+                     stty intr 
+                     exit 1
+                 else
+                     vFileCTL1=$vFileCTL
+                     vFileCTL=$vFileCTL2
+                 fi
+                 vFileCTL1="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+                 vOpcRepro="S"
+                 vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+                 nohup ${DIRBIN}/SGCPCLR.sh ${vFecSes} ${vCodHCierre} OUTMC ${pOpcRepro} S 1>${vFileLOG} 2>&1 &
+                 BGPID=$!
+                 PIDOUTMC=$BGPID
+                 vSTARTMC=$DIRTMP/STARTMC
+                 touch $vSTARTMC
+                 echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                 echo "Se inicio el proceso de Outgoing de MasterCard (Cierre 2)" | tee -a $vAutoLog
+                 echo "Numero de Proceso: $BGPID" | tee -a $vAutoLog
+                 echo "Log: $vFileLOG" | tee -a $vAutoLog
+                 echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                 vOUTSTART=5
+              fi
+           fi
+           if [ "$vCodHCierre" = "2" ] && [ "$vOUTSTART" = "5" ]
+           then
+              vFileCTL2=$vFileCTL
+              vFileCTL=$vFileCTL1
+#              echo "Archivo de Control: $vFileCTL" | tee -a $vAutoLog
+#              cat $vFileCTL | tee -a $vAutoLog
+              f_admCTL R
+#              echo "Status Master Card: $vEstOUTMC" | tee -a $vAutoLog
+              if [ "$vEstOUTMC" = "F" ]
+              then
+                vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+                echo "***************************************************************************" | tee -a $vAutoLog
+                echo "el Proceso de OutGoing de MASTERCARD (Cierre 2) Finalizo EXITOSAMENTE" | tee -a $vAutoLog
+                echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+                echo "***************************************************************************" | tee -a $vAutoLog
+                vOUTSTART=6
+                vFileCTL1=$vFileCTL
+                vFileCTL=$vFileCTL2
+                wait $PIDOUTMC
+                echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                echo "Copiando Archivos IPM de MasterCard al Servidor de PRE-EDIT" | tee -a $vAutoLog
+                echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+                vSSHStat=0
+                vSSHELOGSZ=0
+                vSSHERROR=0
+                case $COD_AMBIENTE in
+                   DESA)
+                     vTipoBulk="R119";;
+                   CCAL)
+                     vTipoBulk="R119";;
+                   PROD)
+                     vTipoBulk="R111";;
+                esac
+                if [ "$vCodHCierre" = "1" ]
+                then 
+                  vFecJul="`dayofyear ${vFecSes}`"
+                else
+                  vFecJul="`dayofyear ${vFecAbo}`"
+                fi
+                vFecJul=`printf "%03d" $vFecJul`
+                vFHsys=`date '+%Y%m%d%H%M%S'`
+                vFileParSFTP="${DIRTMP}/${dpNom}_${vFHsys}.PAR.SFTP"
+                vFileBatSFTP="${DIRTMP}/${dpNom}_${vFHsys}.BAT.SFTP"
+                for vEndPoint in 01857 01858
+                do
+                   case $vEndPoint in
+                      01858)
+                         vRUTAWIN="$PSFTP_MC/0070193_BP";;
+                      01857)
+                         vRUTAWIN="$PSFTP_MC/0071049_BM";;
+                   esac
+
+                   vARCHMC=`ls ${DIROUT}/${vTipoBulk}${vEndPoint}${vFecJul}[0-2][0-9].IPM 2>/dev/null | wc -l`
+                   vARCHMC=`printf "%d" "$vARCHMC"`
+                   if [ "$vARCHMC" = "0" ]
+                   then
+                     vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+                     tput setf 8
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     echo "El Archivo de Outgoing de Master Card del Adquiriente $vEndPoint" | tee -a $vAutoLog
+                     echo "Archivo cuyo nombre empieza con: $DIROUT/$vTipoBulk$vEndPoint$vFecJul" | tee -a $vAutoLog
+                     echo "No Existe o esta Vacio" | tee -a $vAutoLog
+                     echo "Esto Indica una falla no detectada en el Proceso de Outgoing de Master Card" | tee -a $vAutoLog
+                     echo "Revisar el log $vFileLOG" | tee -a $vAutoLog
+                     echo "***************************************************************************" | tee -a $vAutoLog
+                     tput setf 7
+                     sqlplus -s $DB @$DIRBIN/alertacie MC OUTMC "Outgoing_MasterCard_Archivo_$vTipoBulk$vEndPoint$vFecJul_No_Existe_o_Vacio"
+#                     vSSHERROR=1
+                     vEstOUTMC="E"
+                     continue
+                   fi
+                   if [ "$vARCHMC" -gt "0" ]
+                   then
+                      for vARCHMC in `ls -t ${DIROUT}/${vTipoBulk}${vEndPoint}${vFecJul}[0-2][0-9].IPM`
+                      do
+                        if [ "$vARCHMC" -nt "$vSTARTMC" ]
+                        then
+                          vARCHMCD=$vARCHMC.CONV
+#                          unix2dos -ascii -437 $vARCHMC $vARCHMCD
+#                          mv $vARCHMCD $vARCHMC
+                          echo "put $vARCHMC ${vRUTAWIN}"  >> $vFileBatSFTP
+                        fi
+                      done
+                      sftp -b $vFileBatSFTP ${SFTP_USER}@${SFTP_MC} > $vFileParSFTP 2>&1
+                      vSSHStat=$?
+#                      cat $vFileParSFTP | tee -a $vAutoLog
+                      vSSHELOGSZ=`/usr/xpg4/bin/grep -v -e mkdir -e put -e Uploading -e sftp -e Connecting $vFileParSFTP | wc -l`
+                      if [ "$vSSHStat" != "0" ] || [ "$vSSHELOGSZ" -gt "0" ]
+                      then
+                         vSSHERROR=1
+                         cat $vFileParSFTP | tee -a $vAutoLog
+                      fi
+                   else
+                      vSSHERROR=1
+                   fi
+                done
+					#GLOBALR - IPR 1148 - Se saca del for todo el bloque de la condicion   if [ "$vSSHERROR" = "0" ], para garantizar envÃ­o de archivos existentes
+					if [ "$vSSHERROR" = "0" ]
+				   then
+					  #GLOBALR 27/01/2015 IPR 1148 - Transferencia de Archivos del Outgoing a los bancos
+					   SGCFTPOutgoingAdq.sh ${vFecSes} BM MC ${vCodHCierre} ${vFecAbo}
+					   SGCFTPOutgoingAdq.sh ${vFecSes} BP MC ${vCodHCierre} ${vFecAbo}
+					fi					
+				
+                if [ "$vSSHERROR" = "0" ] && [ "$vARCHMC" != "0" ]
+                then
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   echo "Copia de Archivos de Mastercard" | tee -a $vAutoLog
+                   echo "Finalizada CORRECTAMENTE" | tee -a $vAutoLog
+                   echo "Ejecutar Proceso de Validacion en PRE-EDIT" | tee -a $vAutoLog
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   echo "Archivos de Outgoing de MasterCard Transferidos al Servidor de PRE-EDIT, favor efectuar su validacion y transferencia" | mailx -c "$vMAILRECC" -s "Outgoing Master Card" $vMAILREC
+                rm $vFileBatSFTP
+                rm $vFileParSFTP
+                else
+                   tput setf 8
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   echo "Copia de Archivos de Mastercard" | tee -a $vAutoLog
+                   echo "Finalizada EN ERROR" | tee -a $vAutoLog
+                   echo "***************************************************************************" | tee -a $vAutoLog
+                   tput setf 7
+#                   echo "Error en la Transferencia de Archivos de Outgoing de MasterCard , revisar el log: $vAutoLog" | mailx -c "$vMAILRECC" -s "Error Transferencia Outgoing MasterCard" $vMAILREC
+                    sqlplus -s $DB @$DIRBIN/alertacie MC TOUTMC "Transferencia_Outgoing_MasterCard_Fallida"
+					stty intr 
+                fi
+              elif [ "$vEstOUTMC" = "E" ]
+              then
+                vFileLOG="${DIRLOG}/SGCPCLROUTMC${vFecSes}.${vCodHCierre}.LOG"
+                tput setf 8
+                echo "***************************************************************************" | tee -a $vAutoLog
+                echo "Error, el Proceso de OutGoing de MASTERCARD (Cierre 2) Finalizo CON ERRORES" | tee -a $vAutoLog
+                echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+                echo "***************************************************************************" | tee -a $vAutoLog
+                tput setf 7
+                vOUTSTART=6
+                vFileCTL1=$vFileCTL
+                vFileCTL=$vFileCTL2
+              fi
+           fi
+           if [ "$vTOTLIQLISTA" = "${#STATLIQ[*]}" ] && [ "$ERRORCIE" = "0" ] && [ "$vCIESTART" = "0" ]
+           then
+              vFileCTL="${DIRDAT}/SGCPCIE${vFecAbo}.${vCodHCierre}.CTL"
+              vFileLOG="${DIRLOG}/SGCPLIQCIE${vFecAbo}.${vCodHCierre}.${vpFH}.LOG"
+              vEstCIE=`awk '{print substr($0,12,1)}' $vFileCTL 2> /dev/null`
+              if [ "$vFRepro" = "S" ]
+              then
+                 vTipoProc="RT"
+              else
+                 vTipoProc="N"
+              fi
+              if [ "$vEstCIE" = "F" ] && [ "$vFRepro" != "S" ]
+              then
+                  tput setf 8
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  echo "Error, el Proceso de Cierre de Liquidacion de este periodo ya fue efectuado" | tee -a $vAutoLog
+                  echo "El Proceso de Cierre Automatico ha sido Abortado" | tee -a $vAutoLog
+                  echo "***************************************************************************" | tee -a $vAutoLog
+                  tput setf 7
+                  sqlplus -s $DB @$DIRBIN/alertaciep CIE CIERRELIQ "Cierre_de_Liquidaciones_ya_efectuado"
+                  kill -9 $(jobs -p) > /dev/null 2>&1
+                  trap - 0 1 2 3 15 24
+                  stty intr 
+                  exit 1
+              fi
+              #PROCESO DE CIERRE AUTOMATICO
+               nohup $DIRBIN/SGCPLIQCIE.sh $vFecAbo $vFecSes $vCodHCierre T $vTipoProc S 1>$vFileLOG 2>&1 &
+               BGPID=$!
+               PCIELIQ=$BGPID
+               echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+               echo "Se inicio el proceso de Cierre de Liquidacion, Numero de Proceso: $BGPID" | tee -a $vAutoLog
+               echo "Log: $vFileLOG" | tee -a $vAutoLog
+               echo "------------------------------------------------------------------------------" | tee -a $vAutoLog
+               vCIESTART=1
+           elif [ "$vTOTLIQLISTA" = "${#STATLIQ[*]}" ] && [ "$ERRORCIE" = "1" ] && [ "$vCIESTART" = "0" ] && [ "$vNOCIERRE" = "0" ]
+               then
+               tput setf 8
+               echo "***************************************************************************" | tee -a $vAutoLog
+               echo "ERROR En El proceso de Liquidacion de los Adquirientes" | tee -a $vAutoLog 
+               echo "NO SE EFECTUARA El Cierre de Liquidacion"  | tee -a $vAutoLog
+               echo "***************************************************************************" | tee -a $vAutoLog
+               tput setf 7
+               vNOCIERRE="1"
+               
+           fi
+#           echo "CONTADORPASE = $CONTADORPASE"
+#           if [ "$vTOTLIQLISTA" = "${#STATLIQ[*]}" ] && [ "$vOUTSTART" = "6" ] && [ "$vCIESTART" = "1" ] && [ "$CONTADORPASE" -ge "900" ]
+           if [ "$vTOTLIQLISTA" = "${#STATLIQ[*]}" ] && [ "$vOUTSTART" = "6" ] && [ "$vCIESTART" = "1" ]
+           then
+              break
+           fi
+           if [ "$vTOTLIQLISTA" = "${#STATLIQ[*]}" ] && [ "$vOUTSTART" = "6" ] && [ "$vNOCIERRE" = "1" ]
+           then
+              break
+           fi
+           if [ "$vCodHCierre" = "2" ] && [ "$vCIESTART" = "1" ]
+           then
+              vFileCTLCLR="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+              vFileCTLCIE="${DIRDAT}/SGCPCIE${vFecAbo}.${vCodHCierre}.CTL"
+              if [ "$vFileCTLCIE" -nt "$vFileCTLCLR" ]
+              then
+                 vProcCIELIQISLRBM=`awk '{print substr($0,29,1)}' $vFileCTLCIE 2> /dev/null`
+                 vProcCIELIQISLRBP=`awk '{print substr($0,31,1)}' $vFileCTLCIE 2> /dev/null`
+                 vProcCIELIQLA=`awk '{print substr($0,33,1)}' $vFileCTLCIE 2> /dev/null`
+                 vProcCIELIQSDX=`awk '{print substr($0,37,1)}' $vFileCTLCIE 2> /dev/null`
+                 vProcCIELIQCM=`awk '{print substr($0,39,1)}' $vFileCTLCIE 2> /dev/null`
+#                 echo $vProcCIELIQISLRBM
+#                 echo $vProcCIELIQISLRBP
+#                 echo $vProcCIELIQLA
+#                 echo $vProcCIELIQSDX
+#                 echo $vProcCIELIQCM
+#                 echo $vPROCCIELIQ
+#                 echo $CONTADORPASE
+                 if [ "$vProcCIELIQISLRBM" = "F" ] && [ "$vPROCCIELIQ" = "4" ]
+                 then 
+                    transfISLRBM
+                    vPROCCIELIQ=5
+                 fi
+                 if [ "$vProcCIELIQISLRBP" = "F" ] && [ "$vPROCCIELIQ" = "5" ]
+                 then 
+                    transfISLRBP
+                    vPROCCIELIQ=6
+                 fi
+                 if [ "$vProcCIELIQLA" = "F" ] && [ "$vPROCCIELIQ" = "6" ]
+                 then 
+                    transfLA
+                    vPROCCIELIQ=8
+                 fi
+                 if [ "$vProcCIELIQSDX" = "F" ] && [ "$vPROCCIELIQ" = "8" ]
+                 then 
+                    transfSDX
+                    vPROCCIELIQ=9
+                 fi
+                 if [ "$vProcCIELIQSDX" = "F" ] && [ "$vPROCCIELIQ" = "10" ]
+                 then 
+                    transfCM
+                    vPROCCIELIQ=11
+                 fi
+              fi
+           fi
+#           if [ "$vOUTSTART" -gt "1" ]
+#           then
+#              CONTADORPASE=`expr $CONTADORPASE + 1`
+#           fi
+        done
+        if [ "$vCIESTART" = "1" ]
+        then
+           vFileLOG="${DIRLOG}/SGCPLIQCIE${vFecAbo}.${vCodHCierre}.${vpFH}.LOG"
+           vFileCTL="${DIRDAT}/SGCPCIE${vFecAbo}.${vCodHCierre}.CTL"
+           vEstSubProc[0]="D"
+           vPosSubProc[0]="0"
+           for vSubProc in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+           do
+               vEstSubProc[$vSubProc]="0"
+               vPosSubProc[$vSubProc]=`expr 23 + 2 \* \( $vSubProc - 1 \)`
+           done
+           sleep 10
+           vEstCIE=`awk '{print substr($0,12,1)}' $vFileCTL 2> /dev/null`
+           echo "Revisando Estado de los Sub-Procesos del Cierre" | tee -a $vAutoLog
+           vSubProcT=0
+           while [ "$vSubProcT" -lt  "24" ]
+           do
+              for vSubProc in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+              do
+                 vCurrSubProc=`awk '{print substr($0,20,2)}' $vFileCTL`
+                 vEstCIE=`awk '{print substr($0,12,1)}' $vFileCTL 2> /dev/null`
+                 pEstSubProc=`nawk -v POS=${vPosSubProc[$vSubProc]} '{print substr($0,POS,1)}' $vFileCTL`
+                 vCodSubProc=`printf "%.2d" $vSubProc`
+                 if [ "$pEstSubProc" = "F" ] && [ "$vSubProc" -gt "$vSubProcT" ]
+                 then
+                    Decode_Subproc $vCodSubProc
+                    echo "***************************************************************************" | tee -a $vAutoLog
+                    echo "el Sub-Proceso de Cierre de Liquidacion # $vCodSubProc" | tee -a $vAutoLog
+                    echo "\n$vSTRSubProc\n" | tee -a $vAutoLog
+                    echo "Finalizo EXITOSAMENTE" | tee -a $vAutoLog
+                    echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+                    echo "***************************************************************************" | tee -a $vAutoLog
+                    vSubProcT=$vSubProc
+                    if [ "$vCodSubProc" = "04" ] && [ "$vPROCCIELIQ" = "4" ]
+                    then 
+                       transfISLRBM
+                    fi
+                    if [ "$vCodSubProc" = "05" ] && [ "$vPROCCIELIQ" -le "5" ]
+                    then 
+                       transfISLRBP
+                    fi
+                    if [ "$vCodSubProc" = "06" ] && [ "$vPROCCIELIQ" -le "6" ]
+                    then 
+                       transfLA
+                    fi
+                    if [ "$vCodSubProc" = "08" ] && [ "$vPROCCIELIQ" -le "8" ]
+                    then 
+                       transfSDX
+                    fi
+                    if [ "$vCodSubProc" = "10" ] && [ "$vPROCCIELIQ" -le "10" ]
+                    then 
+                       transfCM
+                    fi
+                 fi
+                 if [ "$pEstSubProc" = "E" ] && [ "$vSubProc" -gt "$vSubProcT" ]
+                 then
+#                    Decode_Subproc $vSubProc
+                    Decode_Subproc $vCodSubProc
+                    tput setf 8
+                    echo "***************************************************************************" | tee -a $vAutoLog
+                    echo "el Sub-Proceso de Cierre de Liquidacion # $vCodSubProc" | tee -a $vAutoLog
+                    echo "\n$vSTRSubProc\n" | tee -a $vAutoLog
+                    echo "Finalizo CON ERRORES" | tee -a $vAutoLog
+                    echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+                    echo "***************************************************************************" | tee -a $vAutoLog
+                    tput setf 7
+                    vSubProcT=$vSubProc
+                 fi
+                 if [ "$pEstSubProc" = "N" ] && [ "$vSubProc" -gt "$vSubProcT" ]
+                 then
+#                    Decode_Subproc $vSubProc
+#                    echo "###########################################################################" | tee -a $vAutoLog
+#                    echo ${vSubProcCIE[$vSubProc]}
+#                    echo "el Sub-Proceso de Cierre de Liquidacion # $vCodSubProc" | tee -a $vAutoLog
+#                    echo "\n$vSTRSubProc\n" | tee -a $vAutoLog
+#                    echo "SOLO SE Ejecutara en la Condicion Cierre 2" | tee -a $vAutoLog
+#                    echo "###########################################################################" | tee -a $vAutoLog
+                     vSubProcT=$vSubProc
+                 fi
+              done
+              vPROCCIECO=""
+              vPROCCIECO=`ps -fu $vTSTUSER | grep $PCIELIQ | grep -v grep`
+              if [ "$vEstCIE" = "E" ] && [ -z "$vPROCCIECO" ]
+              then
+                 break
+              fi
+           done
+           wait $PCIELIQ
+           vEstCIE=`awk '{print substr($0,12,1)}' $vFileCTL 2>/dev/null`
+#           echo "vFileCTL = $vFileCTL"
+#           cat $vFileCTL
+#           echo "vEstCIE = $vEstCIE"
+           if [ "$vEstCIE" = "F" ]
+           then
+              echo "***************************************************************************" | tee -a $vAutoLog
+              echo "el Proceso de Cierre de Liquidacion Finalizo EXITOSAMENTE" | tee -a $vAutoLog
+              echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+              echo "***************************************************************************" | tee -a $vAutoLog
+           else
+              tput setf 8
+              echo "***************************************************************************" | tee -a $vAutoLog
+              echo "el Proceso de Cierre de Liquidacion Finalizo CON ERRORES" | tee -a $vAutoLog
+              echo "Revisar el Log $vFileLOG" | tee -a $vAutoLog
+              echo "***************************************************************************" | tee -a $vAutoLog
+              tput setf 7
+           fi
+           vOpcRepro=N
+        fi
+        # Esperar Archivos de Confirmacion
+        echo "Oprima <ENTER> para Continuar \c"
+        read DUMMY
+      else
+         vFlgOpcErr="S"
+      fi
+      trap - 0 1 2 3 15 24
+      stty intr 
+      vFileCTL="${DIRDAT}/SGCPCLR${vFecSes}.${vCodHCierre}.CTL"
+      f_admCTL R
+fi # Opcion 1 Cierre Automatico
+################################################################################
+# IPR 1039: Actualizacion Menu, adecuacion salir			       #
+# EEVN 									       #
+################################################################################
+      if [ "$vFlgOpcErr" = "S" ] && [ "${vOpcion}" = "q" ]; then
+	  echo
+	  f_msg "${dpNom} - Opcion Incorrecta."
+	  echo
+	  echo "... presione [ENTER] para continuar"
+	  read vContinua 
+      else
+          echo
+          vOpcion=""
+      fi
+################################################################################
+# FIN IPR 1039: Actualizacion Menu, adecuacion salir                           #
+# EEVN 									       #
+################################################################################
+   if [ "$vFlgOpcErr" = "S" ]; then
+      vOpcion=""
+      echo
+      f_msg "${dpNom} - Opcion Incorrecta."
+      echo
+      echo "... presione [ENTER] para continuar."
+      read vContinua
+   fi
+
+done
+
+################################################################################
+## FIN | PROCEDIMIENTO PRINCIPAL
+################################################################################
