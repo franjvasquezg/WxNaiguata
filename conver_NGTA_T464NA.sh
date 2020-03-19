@@ -36,6 +36,30 @@ arch1_t464="arch1t464.txt"
 arch_final_t464=${fileT464}_"conv"
 
 
+
+footer1ab ()
+{
+fT464="$1"
+for num in 0 250 500 750;
+do
+    numA=`expr ${num} + 1`
+    numB=`expr ${num} + 250`
+    awk -F  '/STRL/' ${DIRIN}/${fT464} | cut -c ${numA}-${numB} | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282A' >> ${DIRTMP}/footer1at464.txt
+    awk -F  '/STRL/' ${DIRIN}/${fT464} | cut -c ${numA}-${numB} | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282N' >> ${DIRTMP}/footer1bt464.txt   
+   
+done
+}
+
+footer2 ()
+{
+fT464="$1"
+for num in 1 251 501 751;
+do
+    awk -F '/FTRL/' ${DIRIN}/${fT464} | awk '{print substr($0,'${num}',250)}' | grep -i 'FTRL' | grep -v 'STRL' >> ${DIRTMP}/footer2t464.txt
+done
+}
+
+
 ################################################################################
 ## INICIO | PROCEDIMIENTO PRINCIPAL
 ################################################################################
@@ -43,26 +67,11 @@ arch_final_t464=${fileT464}_"conv"
 
 awk -F  '/FHDR/' ${DIRIN}/${fileT464} | cut -c 1-500 | grep -v "REC" > ${DIRTMP}/headert464.txt
 awk -F  '/REC/' ${DIRIN}/${fileT464} | cut -c 1-500 | grep -v "FHDR" > ${DIRTMP}/body1t464.txt
-awk -F  '/REC/' ${DIRIN}/${fileT464} | cut -c 501-1000 | grep -v "STRL" > ${DIRTMP}/body2t464.txt
+awk -F  '/REC/' ${DIRIN}/${fileT464} | cut -c 501-1000 | grep -v "FHDR" > ${DIRTMP}/body2t464.txt
 
+footer1ab ${DIRIN}/${fileT464}
 
-awk -F  '/STRL/' ${DIRIN}/${fileT464} | cut -c 1-250 | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282A' >> ${DIRTMP}/footer1at464.txt
-awk -F  '/STRL/' ${DIRIN}/${fileT464} | cut -c 251-500 | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282A' >> ${DIRTMP}/footer1at464.txt 
-awk -F  '/STRL/' ${DIRIN}/${fileT464} | cut -c 501-750 | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282A' >> ${DIRTMP}/footer1at464.txt
-awk -F  '/STRL/' ${DIRIN}/${fileT464} | cut -c 751-1000 | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282A' >> ${DIRTMP}/footer1at464.txt
-
-
-awk -F  '/STRL/' ${DIRIN}/${fileT464} | cut -c 1-250 | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282N' >> ${DIRTMP}/footer1bt464.txt
-awk -F  '/STRL/' ${DIRIN}/${fileT464} | cut -c 251-500 | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282N' >> ${DIRTMP}/footer1bt464.txt
-awk -F  '/STRL/' ${DIRIN}/${fileT464} | cut -c 501-750 | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282N' >> ${DIRTMP}/footer1bt464.txt
-awk -F  '/STRL/' ${DIRIN}/${fileT464} | cut -c 751-1000 | grep -v 'REC'| grep -v 'FTRL' | grep -i '9282N' >> ${DIRTMP}/footer1bt464.txt
-
-
-awk -F  '/FTRL/' ${DIRIN}/${fileT464} | awk '{print substr($0,1,250)}' | grep -i 'FTRL' | grep -v 'STRL' >> ${DIRTMP}/footer2t464.txt
-awk -F  '/FTRL/' ${DIRIN}/${fileT464} | awk '{print substr($0,251,250)}' | grep -i 'FTRL' | grep -v 'STRL' >> ${DIRTMP}/footer2t464.txt
-awk -F  '/FTRL/' ${DIRIN}/${fileT464} | awk '{print substr($0,501,250)}' | grep -i 'FTRL' | grep -v 'STRL' >> ${DIRTMP}/footer2t464.txt
-awk -F  '/FTRL/' ${DIRIN}/${fileT464} | awk '{print substr($0,751,250)}' | grep -i 'FTRL' | grep -v 'STRL' >> ${DIRTMP}/footer2t464.txt
-
+footer2 ${DIRIN}/${fileT464}
 
 cat ${DIRTMP}/headert464.txt > ${DIRTMP}/arch1t464.txt
 cat ${DIRTMP}/body1t464.txt >> ${DIRTMP}/arch1t464.txt
