@@ -549,8 +549,8 @@ while ( test -z "$vOpcion" || true ) do
       echo 
       echo "   PROCESOS                                        "
       echo "  -------------------------------------            "
-      echo "    [10]  Incoming de Visa NAIGUATA"
-      echo "    [20]  Incoming de MasterCard NAIGUATA   "
+      echo "    [20]  Incoming de Visa NAIGUATA"
+      echo "    [30]  Incoming de MasterCard NAIGUATA   "
       echo
       echo
       echo "   [Q] Cancelar"
@@ -578,7 +578,7 @@ while ( test -z "$vOpcion" || true ) do
 
       fi # Incoming de Visa NAIGUATA
 
-      if [ "$vOpcADQ" = "20" ]; then  # Incoming de MasterCard  NAIGUATA
+      if [ "$vOpcADQ" = "30" ]; then  # Incoming de MasterCard  NAIGUATA
          clear   #limpia la pantalla para visualizarmejor el menu ip1302 fjvg
          vFlgOpcErr="N"
          vOpcion=""
