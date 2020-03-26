@@ -63,7 +63,7 @@ pFecha="$1"
 
    # Validacion de Anio
 
-   if [ $anio -lt 1980 ] || [ $anio -gt 2020 ]; then
+   if [ $anio -lt 1980 ] || [ $anio -gt 2040 ]; then
       # echo " ERROR: Fecha Incorrecta"
       exit 1
    fi
