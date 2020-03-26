@@ -866,13 +866,13 @@ f_Outgoing_mcng ()
    f_vrfvalret "$?" "Error al ejecutar PQOUTGOINGMC_NGTA.F_MAIN. Avisar a Soporte."
    vEst=`echo $vRet | awk '{print substr($0,1,1)}'`
    if [ "$vEst" = "0" ]; then
-      vFileOUTMC=`echo "$vRet" | awk '{print substr($0,2,23)}'`
+      vFileOUTMC=`echo "$vRet" | awk '{print substr($0,2,28)}'`
       f_fhmsg "Archivo Generado: ${vFileOUTMC}"
-      SGCOUTMCconv.sh ${vFileOUTMC}
-      vFileOUTMC=`echo "$vRet" | awk '{print substr($0,25,23)}'`
+      SGCOUTMCconv_ngta.sh ${vFileOUTMC}
+      vFileOUTMC=`echo "$vRet" | awk '{print substr($0,25,28)}'`
       if [ "${vFileOUTMC}" != "" ]; then
          f_fhmsg "Archivo Generado: ${vFileOUTMC}"
-         SGCOUTMCconv.sh ${vFileOUTMC}
+         SGCOUTMCconv_ngta.sh ${vFileOUTMC}
       fi
    elif [ "$vEst" = "W" ]; then
         vRet=`echo "$vRet" | awk '{print substr($0,2)}'`
@@ -888,10 +888,10 @@ f_Outgoing_mcng ()
       f_vrfvalret "$?" "Error al ejecutar PQOUTRETORNOMC.F_MAIN. Avisar a Soporte."
       vEst=`echo $vRet | awk '{print substr($0,1,1)}'`
       if [ "$vEst" = "0" ]; then
-         vFileOUTMC=`echo "$vRet" | awk '{print substr($0,2,23)}'`
+         vFileOUTMC=`echo "$vRet" | awk '{print substr($0,2,28)}'`
          f_fhmsg "Archivo Generado: ${vFileOUTMC}"
          SGCOUTMCconv.sh ${vFileOUTMC}
-         vFileOUTMC=`echo "$vRet" | awk '{print substr($0,25,23)}'`
+         vFileOUTMC=`echo "$vRet" | awk '{print substr($0,25,28)}'`
          if [ "${vFileOUTMC}" != "" ]; then
             f_fhmsg "Archivo Generado: ${vFileOUTMC}"
             SGCOUTMCconv.sh ${vFileOUTMC}
