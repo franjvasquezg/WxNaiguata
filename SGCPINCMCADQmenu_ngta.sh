@@ -553,7 +553,9 @@ while ( test -z "$vOpcion" || true ) do
                        sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Archivo_${vARCHINC[$vADQIDX]}_Adquiriente_${vEndPoint}_$vEntAdq_No_Procesado"
                  else
                      f_msg "-----------Convirtiendo archivos T464Na_vEndPoint_0502_0_conv-------------------" N S #IPR1302 18032020
+                     trap "trap '' 2" 2
                      ${DIRBIN}/conver_NGTA_T464NA.sh $DIRIN/$vArchDest
+                     trap ""               #En caso que falle IPR1302 fjvg 25082020
                      if [ -f "$DIRIN/$vArchDest_conv" ]; then
                         echo " "
                         echo "Archivo ${vARCHINC[$vADQIDX]} Movido al Directorio Procesado(E)" | tee -a $vFileLOG
@@ -722,8 +724,8 @@ while ( test -z "$vOpcion" || true ) do
 #						then
 #							 echo "error en el renombrado de los archivos ${vARCHINC[$vADQIDX]} del adquiriente $vEntAdq al XCOM, favor revisar" | tee -a $vFileLOG
 #						fi								 
- #                done
-  #               if [ "$vSTATT" -ne "0" ]
+#                 done
+#                if [ "$vSTATT" -ne "0" ]
 #                 then
 #                    vTRANS464_XCOM=1
 #                    tput setf 8
@@ -852,7 +854,7 @@ while ( test -z "$vOpcion" || true ) do
 set head off
 set pagesize 0000
 select to_char(to_date('$vFecProc','YYYYMMDD'),'D') from dual;
-!  ####`
+!`
 #`  No olvidar la comilla ###########################################3
 
          if [ "$pEntAdq" = "TODOS" ]
