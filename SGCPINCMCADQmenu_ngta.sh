@@ -527,7 +527,7 @@ while ( test -z "$vOpcion" || true ) do
                      trap "trap '' 2" 2
                      ${DIRBIN}/conver_NGTA_T464NA.sh $DIRIN/$vArchDest
                      trap ""               #En caso que falle IPR1302 fjvg 25082020
-                     if [ -f "$DIRIN/$vArchDest_conv" ]; then
+                     ##if [ -f "$DIRIN/$vArchDest_conv" ]; then
                         echo " "
                         echo "Archivo ${vARCHINC[$vADQIDX]} Movido al Directorio Procesado(E)" | tee -a $vFileLOG
                         echo "rm $vPrefijo/$vEntAdq/T$vpValRet_6/RESPALDO/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
@@ -572,12 +572,11 @@ while ( test -z "$vOpcion" || true ) do
                            mv $DIRIN/$vArchDest $DIRIN/${vArchDest}_bkp
                            mv $DIRIN/$vArchDest_conv $DIRIN/${vArchDest_conv}_bkp
                         fi
-                     else
-                        echo "Generacion de archivo T464NA-CONV Fallida" | tee -a $vFileLOG
-                       tput setf 7
-                       sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_ARCHIVOS T464NA-CONV_${vARCHINC[$vADQIDX]}_Adquiriente_$vEntAdq - ${vEndPoint}"
-                       
-                     fi  
+                     ##else
+                     ##   echo "Generacion de archivo T464NA-CONV Fallida" | tee -a $vFileLOG
+                     ##  tput setf 7
+                     ##  sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_ARCHIVOS T464NA-CONV_${vARCHINC[$vADQIDX]}_Adquiriente_$vEntAdq - ${vEndPoint}"
+                     ##fi  
                  fi
               fi
               vADQIDX=`expr $vADQIDX + 1`
@@ -692,7 +691,7 @@ while ( test -z "$vOpcion" || true ) do
                      echo "No se Procesara el Archivo ${vARCHINC}" | tee -a $vFileLOG
                      tput setf 7
                      sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Archivo_${vARCHINC}_Adquiriente_${vEndPoint}_$pEntAdq_No_Procesado"
-               else
+                  else
                   f_msg "-----------Convirtiendo archivos T464Na_vEndPoint_0502_0_conv-------------------" N S #IPR1302 18032020
                   trap "trap '' 2" 2
                   ${DIRBIN}/conver_NGTA_T464NA.sh $DIRIN/$vArchDest
