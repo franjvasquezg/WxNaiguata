@@ -568,12 +568,12 @@ while ( test -z "$vOpcion" || true ) do
          vFlgOpcErr="N"
       fi
 
-      if [ "$vOpcADQ" = "10" ]; then  # Incoming de Visa NAIGUATA
+      if [ "$vOpcADQ" = "20" ]; then  # Incoming de Visa NAIGUATA
          clear   #limpia la pantalla para visualizarmejor el menu ip1302 fjvg
          vFlgOpcErr="N"
          vOpcion=""
          
-         echo "    [10]  Incoming de Visa NAIGUATA <<<EN CONTRUCCION>>>"
+         echo "    [20]  Incoming de Visa NAIGUATA <<<EN CONTRUCCION>>>"
 
 
       fi # Incoming de Visa NAIGUATA
