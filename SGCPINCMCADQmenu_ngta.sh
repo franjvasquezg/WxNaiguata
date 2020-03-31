@@ -264,9 +264,10 @@ f_menuOPC ()
 
 find_footer ()
 {
+fT464="$1"
 for sec in 1 251 501 751
 do
-    pie=`awk -F '/FTRL/' ${DIRIN}/another/${fT464} | awk '{print substr($0,'${sec}',250)}' | grep -i 'FTRL' | grep -v 'STRL' | awk '{print substr($0,0,4)}'`
+    pie=`awk -F '/FTRL/' ${DIRIN}/${fT464} | awk '{print substr($0,'${sec}',250)}' | grep -i 'FTRL' | grep -v 'STRL' | awk '{print substr($0,0,4)}'`
     vFOOTER=${pie}
 done
 
@@ -499,7 +500,7 @@ while ( test -z "$vOpcion" || true ) do
                     echo "Archivo ${vARCHINC[$vADQIDX]} Transferido Correctamente"
                     vENCABEZADO=`head -1 $DIRIN/$vArchDest | awk '{print substr($0,0,4)}'`
                     # Buscar el footer y lo almacena en la variable --> vFOOTER
-                    find_footer $DIRIN/$vArchDest           
+                    find_footer $vArchDest           
 
                     if [ "$vENCABEZADO" = "FHDR" ] && [ "$vFOOTER" = "FTRL" ]
                     then
