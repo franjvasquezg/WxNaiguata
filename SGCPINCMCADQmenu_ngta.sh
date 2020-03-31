@@ -1641,7 +1641,7 @@ while ( test -z "$vOpcion" || true ) do
          then
             stty intr 
             vADQIDX=0
-            #f_fechora $vFecProc
+            f_fechora $vFecProc
             #vFecArch="$vAno-$vMes-$vDia"
             #vFecJul=`dayofyear ${vFecProc}`
             #vFecJul=`printf "%03d" $vFecJul`
@@ -1666,7 +1666,7 @@ while ( test -z "$vOpcion" || true ) do
                      vEntAdq2=0108;;
                esac
 
-               for SWTIPO in 53 353 363 412  # Procesamos los 4 reportes SWCHD Debito MC Naiguata
+               for SWTIPO in 53 353 363 412  # Procesamos los 4 reportes SWCHD Debito MC Naiguata Opcion Todos
                do
                
                      vFileREPDEBMAESTRO="SGCPINCMC${vEntAdq}.REPDEBMAESTRO.${vFecProc}"
@@ -1731,8 +1731,8 @@ while ( test -z "$vOpcion" || true ) do
                            fi
                            echo " "
                            echo "Archivo ${vARCHINC[$vADQIDX]} Movido al Directorio Procesado(E)" | tee -a $vFileLOG
-                           echo "rename $vPrefijo/$vEntAdq/T$vpValRet_9/${vARCHINC[$vADQIDX]} $vPrefijo/$vEntAdq/T$vpValRet_9/RESPALDO/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-                           sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                           #echo "rename $vPrefijo/$vEntAdq/T$vpValRet_9/${vARCHINC[$vADQIDX]} $vPrefijo/$vEntAdq/T$vpValRet_9/RESPALDO/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                           #sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
          #                    pg $DIRIN/$vArchDest
                         fi
                      fi
@@ -1750,85 +1750,103 @@ while ( test -z "$vOpcion" || true ) do
          else
             case $pEntAdq in
                BM)
-                 vEndPoint=01857;;
+                  vEndPoint=0275
+                  vEntAdq2=0105;;
                BP)
-                 vEndPoint=01858;;
+                 vEndPoint=0313
+                 vEntAdq2=0108;;
             esac
             f_fechora $vFecProc
-            vFecJul=`dayofyear ${vFecProc}`
-            vFecJul=`printf "%03d" $vFecJul`
-            vFecArch="$vAno-$vMes-$vDia"
-            vFileREPDEBMAESTRO="SGCPINCMC${pEntAdq}.REPDEBMAESTRO.${vFecProc}"
-            vFileLOG="${DIRLOG}/${vFileREPDEBMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
-            echo "cd $vPrefijo/$pEntAdq/T$vpValRet_9" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-            echo "ls TT${vpValRet_9}T0.${vFecArch}*" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-            vARCHINC=`sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} 2>/dev/null | grep -v sftp\> | wc -l`
-            if [ "$vARCHINC" -lt "1" ]
-            then
-               echo "No existe el Archivo de Reporte Debito Maestro para el Adquiriente $pEntAdq" | tee -a $vFileLOG
-               sqlplus -s $DB @$DIRBIN/alertacie INC REPMAESTRO "Reporte_de_Debito_Maestro_Adquiriente_$vEntAdq_No_Existe"
-            fi
-            if [ "$vARCHINC" -gt "1" ]
-            then
-               echo "Existe mas de Un Archivo de Reporte Debito Maestro para el Adquiriente $pEntAdq, favor revisar" | tee -a $vFileLOG
-               sqlplus -s $DB @$DIRBIN/alertacie INC REPMAESTRO "Numero_Incorrecto_de_Archivos_de_Reporte_Debito_Maestro_Adquiriente_$vEntAdq_No_Existe"
-            fi
-            if [ "$vARCHINC" -eq "1" ]
-            then
-               vARCHINC=`sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} 2>/dev/null | grep -v sftp\>`
-               vArchDest=`echo ${vARCHINC} | cut -d. -f1`
-               vArchDest=${vArchDest}_${vEndPoint}.001
-               echo "cd $vPrefijo/$pEntAdq/T$vpValRet_9" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-               echo "get $vARCHINC $DIRIN/$vArchDest" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-               sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} | grep -v Fetching >> $vFileLOG 2>&1
-               vSTATT=$?
-               if [ "$vSTATT" != "0" ]
+            #vFecJul=`dayofyear ${vFecProc}`
+            #vFecJul=`printf "%03d" $vFecJul`
+            #vFecArch="$vAno-$vMes-$vDia"
+
+            ## Ibteniendo Fecha Juliana MENOS 1 
+            vFecJul=`dayofyear ${vFecProc}`    
+            vFecJul=`expr ${vFecJul} - 1`      #Ajuste T464NA Este archivo es del dia de AYER ipr1302 
+            vFecJul=`printf "%03d" $vFecJul`   #Ajuste T464NA Este archivo es del dia de AYER ipr1302 
+
+            ## Corresponde al último dígito del año al que corresponde el bulk, 
+            ## Es decir, el cero corresponde al año 2020 para el año venidero el valor deberá ser 1.
+            vNomFile_SecA=`echo ${vFecProc} | awk '{print substr($0,4,1)}'`
+
+            for SWTIPO in 53 353 363 412  # Procesamos los 4 reportes SWCHD Debito MC Naiguata
+            do
+               vFileREPDEBMAESTRO="SGCPINCMC${pEntAdq}.REPDEBMAESTRO.${vFecProc}"
+               vFileLOG="${DIRLOG}/${vFileREPDEBMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
+               echo "cd $vPrefijo" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+               echo "ls ${vpValRet_10}${SWTIPO}_${vEndPoint}_${vEntAdq2}_${vNomFile_SecA}_${vFecJul}*" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+               vARCHINC=`sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} 2>/dev/null | grep -v sftp\> | wc -l`
+               if [ "$vARCHINC" -lt "1" ]
                then
-                  tput setf 8
-                  echo "error en la transferencia del archivo $vARCHINC del adquiriente $pEntAdq, favor revisar" | tee -a $vFileLOG
-                  tput setf 7
-                  sqlplus -s $DB @$DIRBIN/alertacie INC REPMAESTRO "Error_Transferencia_de_Archivo_${vARCHINC[$vADQIDX]}_Adquiriente_$pEntAdq"
-               else
-                  vArchDestB="${vpValRet_9}${vEndPoint}_${vFecJul}_01_conv"
-                  scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:${pEntAdq}pu_fileout/$vArchDestB
+                  echo "No existe el Archivo de Reporte Debito Maestro Naiguata para el Adquiriente $pEntAdq" | tee -a $vFileLOG
+                  sqlplus -s $DB @$DIRBIN/alertacie INC REPMAESTRO-NGTA "Reporte_de_Debito_Maestro_Adquiriente_$vEntAdq_No_Existe"
+               fi
+               if [ "$vARCHINC" -gt "1" ]
+               then
+                  echo "Existe mas de Un Archivo de Reporte Debito Maestro para el Adquiriente $pEntAdq, favor revisar" | tee -a $vFileLOG
+                  sqlplus -s $DB @$DIRBIN/alertacie INC REPMAESTRO-NGTA "Numero_Incorrecto_de_Archivos_de_Reporte_Debito_Maestro_Adquiriente_$vEntAdq_No_Existe"
+               fi
+               if [ "$vARCHINC" -eq "1" ]
+               then
+                  vARCHINC=`sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} 2>/dev/null | grep -v sftp\>`
+                  #vArchDest=`echo ${vARCHINC} | cut -d. -f1`
+                  #vArchDest=${vArchDest}_${vEndPoint}.001
+                  vArchDest="${vpValRet_10}${SWTIPO}_${vEndPoint}_${vEntAdq2}_${vNomFile_SecA}_${vFecJul}"
+                  echo "cd $vPrefijo" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                  echo "get ${vARCHINC} $DIRIN/$vArchDest" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                  sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} | grep -v Fetching >> $vFileLOG 2>&1
                   vSTATT=$?
                   if [ "$vSTATT" != "0" ]
                   then
-                    tput setf 8
-                    echo "error en la transferencia del archivo $vArchDest del adquiriente $pEntAdq al area de acceso de los Bancos, favor revisar" | tee -a $vFileLOG
-                    tput setf 7
-                    sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$pEntAdq"
+                     tput setf 8
+                     echo "error en la transferencia del archivo $vARCHINC del adquiriente $pEntAdq, favor revisar" | tee -a $vFileLOG
+                     tput setf 7
+                     sqlplus -s $DB @$DIRBIN/alertacie INC REPMAESTRO-NGTA "Error_Transferencia_de_Archivo_${vARCHINC[$vADQIDX]}_Adquiriente_$pEntAdq"
                   else
-                    echo "Archivo Transferido correctamente al area de acceso de los Bancos"
-                    echo "Transfiriendo Archivo al disco J de SRVCCSALC"
-                    vRUTAWIN1="$vPrefijoWin\\${pEntAdq}\\T$vpValRet_9\\${vARCHINC}"
-                    vRUTAWIN2="\\$vpValRet_9\\$vArchDestB"
-                    vCOPIAWIN=`ssh ${SFTP_USER}@${SFTP_IMC_NGTA} cmd.exe /C "C:\\MFESFTP\\transtmve $vRUTAWIN1 $vPrefijoWin $vRUTAWIN2 $USUARIOTMVE $CLAVETMVE"`
-                    vSTATT=$?
-                    if [ "$vSTATT" != "0" ]
-                    then
-                       tput setf 8
-                       echo "error en la transferencia del archivo $vArchDest del adquiriente $pEntAdq al Disco J de SRVCCSALC, favor revisar" | tee -a $vFileLOG
-                       echo $vCOPIAWIN | tee -a $vFileLOG
-                       tput setf 7
-                       sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
+                     vArchDestB="${vpValRet_9}${vEndPoint}_${vFecJul}_01_conv"
+                     scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:${pEntAdq}pu_fileout/$vArchDestB
+                     vSTATT=$?
+                     if [ "$vSTATT" != "0" ]
+                     then
+                        tput setf 8
+                        echo "error en la transferencia del archivo $vArchDest del adquiriente $pEntAdq al area de acceso de los Bancos, favor revisar" | tee -a $vFileLOG
+                        tput setf 7
+                        sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$pEntAdq"
                      else
-                       echo "Archivo ${vARCHINC[$vADQIDX]} transferido correctamente al Servidor SRVCCSALC (J)"
-                    fi
+                        echo "Archivo Transferido correctamente al area de acceso de los Bancos"
+                        echo "Transfiriendo Archivo al disco R de GERENCIATST"
+                        vRUTAWIN1="$vPrefijoWin\\${vARCHINC}"                                                   ## $COD_AMBIENTE2   NUEVA VARIABLE DE AMBIENTE IPR1302
+                        vRUTAWIN2="\\Procesos\\Compensacion Naiguata-MC\\${COD_AMBIENTE2}\\T461NA\\$vArchDestB" ## $vpValRet_910\\$vArchDestB"
+                        vCOPIAWIN=`ssh ${SFTP_USER}@${SFTP_IMC_NGTA} cmd.exe /C "C:\\MFESFTP\\transtmve $vRUTAWIN1 $vPrefijoWin $vRUTAWIN2 $USUARIOTMVE $CLAVETMVE"`
+                        vSTATT=$?
+                        if [ "$vSTATT" != "0" ]
+                           then
+                              tput setf 8
+                              echo "error en la transferencia del archivo $vArchDest del adquiriente $pEntAdq al Disco R de GERENCIATST, favor revisar" | tee -a $vFileLOG
+                              echo $vCOPIAWIN | tee -a $vFileLOG
+                              tput setf 7
+                              sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
+                           else
+                              echo "Archivo ${vARCHINC} transferido correctamente al Servidor GERENCIATST (R)"
+                        fi
+                     fi
+                     echo " "
+                     echo "Archivo $vARCHINC Movido al Directorio Procesado(R)" | tee -a $vFileLOG
+                     #vNumSec=`echo $vARCHINC | cut -d. -f3`
+                     #echo "rename $vPrefijo/$pEntAdq/T$vpValRet_9/$vARCHINC $vPrefijo/$pEntAdq/T$vpValRet_9/RESPALDO/$vARCHINC" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                     #sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} > /dev/null 2>&1
+
                   fi
-                  echo " "
-                  echo "Archivo $vARCHINC Movido al Directorio Procesado(E)" | tee -a $vFileLOG
-                  vNumSec=`echo $vARCHINC | cut -d. -f3`
-                  echo "rename $vPrefijo/$pEntAdq/T$vpValRet_9/$vARCHINC $vPrefijo/$pEntAdq/T$vpValRet_9/RESPALDO/$vARCHINC" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-                   sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} > /dev/null 2>&1
-                   DUMMY=0
-                   while [ "$DUMMY" != "Q" ] && [ "$DUMMY" != "q" ]
-                   do
-                      echo "Oprima Q o q <ENTER> para volver al Menu \c"
-                      read DUMMY
-                   done
-              fi
-            fi
+               fi
+            done
+            rm $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+            DUMMY=0
+            while [ "$DUMMY" != "Q" ] && [ "$DUMMY" != "q" ]
+            do
+               echo "Oprima Q o q <ENTER> para volver al Menu \c"
+               read DUMMY
+            done
          fi
       fi
 
