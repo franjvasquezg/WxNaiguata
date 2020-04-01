@@ -2,7 +2,7 @@
 
 ################################################################################
 ##
-##  Nombre del Programa : SGCPINCMCADQmenu.sh
+##  Nombre del Programa : SGCPINCMCADQmenu_ngta.sh
 ##                Autor : SSM
 ##       Codigo Inicial : 11/01/2008
 ##          Descripcion : Menu de Incoming de MasterCard
@@ -268,9 +268,10 @@ fT464="$1"
 for sec in 1 251 501 751
 do
     pie=`awk -F '/FTRL/' ${DIRIN}/${fT464} | awk '{print substr($0,'${sec}',250)}' | grep -i 'FTRL' | grep -v 'STRL' | awk '{print substr($0,0,4)}'`
-    vFOOTER=${pie}
+    if [ "${pie}" = "FTRL" ]; then
+     vFOOTER=${pie}
+    fi
 done
-
 }
 
 ################################################################################
@@ -526,8 +527,8 @@ while ( test -z "$vOpcion" || true ) do
                  else
                      f_msg "-----------Convirtiendo archivos T464Na_vEndPoint_0502_0_conv-------------------" N S #IPR1302 18032020
                      trap "trap '' 2" 2
-                     ${DIRBIN}/conver_NGTA_T464NA.sh $DIRIN/$vArchDest
-                     trap ""               #En caso que falle IPR1302 fjvg 25082020
+                     ${DIRBIN}/conver_NGTA_T464NA.sh $vArchDest
+                     #trap ""               #En caso que falle IPR1302 fjvg 25082020
                      ##if [ -f "$DIRIN/$vArchDest_conv" ]; then
                         echo " "
                         echo "Archivo ${vARCHINC[$vADQIDX]} Movido al Directorio Procesado(E)" | tee -a $vFileLOG
@@ -602,9 +603,17 @@ while ( test -z "$vOpcion" || true ) do
                  vEndPoint=0313;;
             esac
             f_fechora $vFecProc
-            vFecJul=`dayofyear ${vFecProc}`
-            vFecJul=`printf "%03d" $vFecJul`
-            vFecArch="$vAno-$vMes-$vDia"
+            ## Se carga las variable para todos las opciones TODOS ó BP & BM Independiente 
+            ## Ibteniendo Fecha Juliana MENOS 1 
+            vFecJul=`dayofyear ${vFecProc}`    
+            vFecJul=`expr ${vFecJul} - 1`      #Ajuste T464NA Este archivo es del dia de AYER ipr1302 
+            vFecJul=`printf "%03d" $vFecJul`   #Ajuste T464NA Este archivo es del dia de AYER ipr1302 
+
+            ## Corresponde al último dígito del año al que corresponde el bulk, 
+            ## Es decir, el cero corresponde al año 2020 para el año venidero el valor deberá ser 1.
+            vNomFile_SecA=`echo ${vFecProc} | awk '{print substr($0,4,1)}'`
+
+            #vFecArch="$vAno-$vMes-$vDia"
             vFileINCMAESTRO="SGCPINCMC${pEntAdq}.INCMAESTRONGTA.${vFecProc}"
             vFileCTL="${DIRDAT}/${vFileINCMAESTRO}.CTL"
             vFileLOG="${DIRLOG}/${vFileINCMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
@@ -613,7 +622,7 @@ while ( test -z "$vOpcion" || true ) do
             if [ "$vEstProc" = "F" ] && [ "$vOpcRepro" != "S" ]
             then
                tput setf 8
-               echo "el Incoming de Debito Maestro Naiguata para este dia ya ha sido procesado"
+               echo "el Incoming de Debito Naiguata Maestro para este dia ya ha sido procesado"
                tput setf 7
                echo " "
             else
@@ -625,20 +634,20 @@ while ( test -z "$vOpcion" || true ) do
                fi
                touch $vFileLOG
                touch $vFileLOG1
-               echo "cd $vPrefijo/$pEntAdq/T$vpValRet_6" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+               echo "cd $vPrefijo/" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
                echo "ls T${vpValRet_6}"NA"_${vEndPoint}_"0502"_${vNomFile_SecA}_${vFecJul}*" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
                vARCHINC=`sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} 2>/dev/null | grep -v sftp\> | wc -l`
                if [ "$vARCHINC" -lt "1" ]
                then
                   tput setf 8
-                  echo "No existe el Archivo de Incoming Debito Maestro para el Adquiriente $pEntAdq - ${vEndPoint}" | tee -a $vFileLOG
+                  echo "No existe el Archivo de Incoming Debito Naiguata Maestro para el Adquiriente $pEntAdq - ${vEndPoint}" | tee -a $vFileLOG
                   tput setf 7
                   sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Archivo_de_Debito_Maestro_Adquiriente_$pEntAdq_No_Existe"
                fi
                if [ "$vARCHINC" -gt "1" ]
                then
                   tput setf 8
-                  echo "Existe mas de Un Archivo de Incoming Debito Maestro Naiguata para el Adquiriente $pEntAdq, favor revisar" | tee -a $vFileLOG
+                  echo "Existe mas de Un Archivo de Incoming Debito Naiguata Maestro para el Adquiriente $pEntAdq, favor revisar" | tee -a $vFileLOG
                   tput setf 7
                   sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Numero_Incorrecto_de_Archivos_de_Debito_Naiguata_Maestro_Adquiriente_$pEntAdq_No_Existe"
                fi
@@ -650,7 +659,7 @@ while ( test -z "$vOpcion" || true ) do
                   #vArchDest="${vpValRet_6}${vEndPoint}_${vFecJul}_${vNumSec}_conv"
                   #echo "cd $vPrefijo/$pEntAdq/T$vpValRet_6" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
                   #echo "get $vARCHINC $DIRIN/$vArchDest" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-		  #  echo "get $vARCHINC $DIRIN/$vARCHINC" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP   #Eliminado GlobalR IPR1156 para traer archivo con formato TT${vpValRet_6}T0 Fase IV
+		            #echo "get $vARCHINC $DIRIN/$vARCHINC" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP   #Eliminado GlobalR IPR1156 para traer archivo con formato TT${vpValRet_6}T0 Fase IV
                   #sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} | grep -v Fetching >> $vFileLOG 2>&1
                   
                   vArchDest="T${vpValRet_6}"NA"_${vEndPoint}_"0502"_${vNomFile_SecA}_${vFecJul}"
@@ -669,7 +678,12 @@ while ( test -z "$vOpcion" || true ) do
                     echo "Archivo $vARCHINC Transferido Correctamente"
                     vENCABEZADO=`head -1 $DIRIN/$vArchDest | awk '{print substr($0,0,4)}'`
                     #vFOOTER=`tail -2 $DIRIN/$vArchDest | head -1 | awk '{print substr($0,0,4)}'`
-                    find_footer $DIRIN/$vArchDest
+                    find_footer $vArchDest
+
+                    echo "Antes de Validar"
+                    echo "vENCABEZADO " $vENCABEZADO
+                    echo "vFOOTER " $vFOOTER
+                    echo " vArchDest "  $vArchDest
 
                     if [ "$vENCABEZADO" = "FHDR" ] && [ "$vFOOTER" = "FTRL" ]
                     then
@@ -692,11 +706,11 @@ while ( test -z "$vOpcion" || true ) do
                      echo "No se Procesara el Archivo ${vARCHINC}" | tee -a $vFileLOG
                      tput setf 7
                      sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Archivo_${vARCHINC}_Adquiriente_${vEndPoint}_$pEntAdq_No_Procesado"
-                  else
-                  f_msg "-----------Convirtiendo archivos T464Na_vEndPoint_0502_0_conv-------------------" N S #IPR1302 18032020
+               else
+                  f_msg "-----------Convirtiendo archivos T464NA_${vEndPoint}_0502_0_conv-------------------" N S #IPR1302 18032020
                   trap "trap '' 2" 2
-                  ${DIRBIN}/conver_NGTA_T464NA.sh $DIRIN/$vArchDest
-                  trap ""                                                        #En caso que falle IPR1302 fjvg 25082020
+                  ${DIRBIN}/conver_NGTA_T464NA.sh $vArchDest
+                  #trap ""                                                        #En caso que falle IPR1302 fjvg 25082020
                      echo " "
                      echo "Archivo $vARCHINC Movido al Directorio Procesado" | tee -a $vFileLOG
                      echo "rm $vPrefijo/$vEntAdq/T$vpValRet_6/RESPALDO/$vARCHINC" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
@@ -741,8 +755,8 @@ while ( test -z "$vOpcion" || true ) do
                      fi
                      rm $DIRTMP/$dpNom$vFecProc.PAR.SFTP
                      rm $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
-		     rm $DIRIN/$vArchDest 2>/dev/null
-		     rm $DIRIN/$vArchDest_conv 2>/dev/null
+		               rm $DIRIN/$vArchDest 2>/dev/null
+		               rm $DIRIN/$vArchDest_conv 2>/dev/null
                      ##rm $DIRIN/TT${vpValRet_6}T0.${vFecArch}*.001 2>/dev/null
                   fi
                fi
