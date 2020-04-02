@@ -555,20 +555,20 @@ while ( test -z "$vOpcion" || true ) do
                            #vArchDestB="${vpValRet_6}${vEndPoint}_${vFecJul}_01_conv"
                            #Se envía transferencia al XCOM del archivo convertido - Retomado en el IPR 1156 Fase IV
                            #scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:${vEntAdq}pu_fileout/$vArchDestB
-                           scp -Bq $DIRIN/$vArchDest* $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/${COD_AMBIENTE}/${vEntAdq}/file_out
+                           scp -Bq $DIRIN/$vArchDest $SSSSH_USER@$FTP_HOSTXCOM:/file_transfer/${COD_AMBIENTE}/${vEntAdq}/file_out
                            vSTATT=$?
                            if [ "$vSTATT" != "0" ]
                               then
                                  tput setf 8
-                                 echo "error en la transferencia del archivo $vArchDest del adquiriente $vEntAdq al area de acceso de los Bancos, favor revisar" | tee -a $vFileLOG
+                                 echo "Error en la transferencia del archivo $vArchDest del adquiriente $vEntAdq al area de acceso de los Bancos, favor revisar" | tee -a $vFileLOG
                                  tput setf 7
-                                 sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
+                                 sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
                            else
                               echo "Archivo Transferido correctamente al area de acceso de los Bancos"
                               echo
                               echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
                               echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" 
-                              scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                              scp -Bq $DIRIN/$vArchDest ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
 
                            fi  ####Fin de la modificación GlobalR IPR1156
                            mv $DIRIN/$vArchDest $DIRIN/${vArchDest}_bkp
@@ -594,7 +594,7 @@ while ( test -z "$vOpcion" || true ) do
                read DUMMY
             done
             stty intr 
-         else         ## INICIO OPCION POR ADQUIRIENTES 
+         else         ## INICIO OPCION POR ADQUIRIENTES MAESTRO NAIGATA
             stty intr 
             case $pEntAdq in
                BM)
@@ -735,7 +735,7 @@ while ( test -z "$vOpcion" || true ) do
                      then
                          #vArchDestB="${vpValRet_6}${vEndPoint}_${vFecJul}_01_conv"
 			 #			      #IPR 1156 GlobalR Fase IV se descomenta Elimininado por IPR1156
-                         scp -Bq $DIRIN/$vArchDest* $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/${COD_AMBIENTE}/${vEntAdq}/file_out
+                         scp -Bq $DIRIN/$vArchDest $SSSSH_USER@$FTP_HOSTXCOM:/file_transfer/${COD_AMBIENTE}/${vEntAdq}/file_out
                          vSTATT=$?
                          if [ "$vSTATT" != "0" ]
                          then
