@@ -245,7 +245,7 @@ esac
 ## INICIO | PROCEDIMIENTO PRINCIPAL
 ################################################################################
 
-dpDesc="Proceso Compensacion de Maestro Naiguata"
+dpDesc="Proceso Compensacion de Naiguata Maestro"
 
 
 ## Verificacion de Parametros

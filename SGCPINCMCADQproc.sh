@@ -335,7 +335,7 @@ elif [ "${pCodProc}" = "INCMATCH" ]; then
 elif [ "${pCodProc}" = "INCMAESTRO" ]; then
      vCodProc="Carga de Incoming MAESTRO"
 elif [ "${pCodProc}" = "INCMAESTRONGTA" ]; then
-     vCodProc="Carga de Incoming MAESTRO Naiguata"
+     vCodProc="Carga de Incoming Naiguata MAESTRO"
 else
      f_msg "Codigo de Proceso Incorrecto."
      f_parametros;
@@ -360,7 +360,11 @@ fi
 
 ## Descripcion del Programa
 ################################################################################
-dpDesc="Carga de Incoming de MasterCard (${vEntAdq}:${pCodProc})"
+if [ "${pCodProc}" = "INCMAESTRONGTA" ]; then
+   dpDesc="Carga de Incoming de Naiguata MasterCard (${vEntAdq}:${pCodProc})"
+else
+   dpDesc="Carga de Incoming de MasterCard (${vEntAdq}:${pCodProc})"
+fi
 
 
 ## Archivo LOG

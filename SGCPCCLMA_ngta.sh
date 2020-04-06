@@ -244,7 +244,7 @@ esac
 ## INICIO | PROCEDIMIENTO PRINCIPAL
 ################################################################################
 
-dpDesc="Proceso Conciliacion de Maestro Naiguata"
+dpDesc="Proceso Conciliacion de Naiguata Maestro"
 
 
 ## Verificacion de Parametros
@@ -306,7 +306,7 @@ elif [ "${pEntAdq}" = "BP" ]; then
    vNomFile_IdAdq="0313"
 fi
 
-## Ibteniendo Fecha Juliana
+## Obteniendo Fecha Juliana
 vNomFile_FeJul=`dayofyear ${pFecProc}`
 vNomFile_FeJul=`expr ${vNomFile_FeJul} - 1`
 vNomFile_FeJul=`printf "%03d" $vNomFile_FeJul`

@@ -2,7 +2,7 @@
 
 ################################################################################
 ##
-##  Nombre del Programa : SGCPINCmenu.sh
+##  Nombre del Programa : PINCmenu
 ##                Autor : SSM
 ##       Codigo Inicial : 11/01/2008
 ##          Descripcion : Menu del Proceso de Incoming
@@ -34,7 +34,7 @@
 ## Datos del Programa
 ################################################################################
 
-dpNom="SGCPINCmenu"           # Nombre del Programa
+dpNom="PINCmenu"           # Nombre del Programa
 dpDesc=""                     # Descripcion del Programa
 dpVer=5.00                    # Ultima Version del Programa
 dpFec="20200203"              # Fecha de Ultima Actualizacion [Formato:AAAAMMDD]
@@ -549,8 +549,8 @@ while ( test -z "$vOpcion" || true ) do
       echo 
       echo "   PROCESOS                                        "
       echo "  -------------------------------------            "
-      echo "    [20]  Incoming de Visa NAIGUATA"
-      echo "    [30]  Incoming de MasterCard NAIGUATA   "
+      echo "    [20]  Incoming de NAIGUATA Visa "
+      echo "    [30]  Incoming de NAIGUATA MasterCard    "
       echo
       echo
       echo "   [Q] Cancelar"
@@ -586,7 +586,7 @@ while ( test -z "$vOpcion" || true ) do
          # INCOMING DE MASTERCARD
 
             echo
-            echo " INCOMING DE MASTERCARD NAIGUATA | Seleccione el Adquirente:"
+            echo " INCOMING DE NAIGUATA MASTERCARD | Seleccione el Adquirente:"
             echo
             echo "   [21] Todos"
             echo

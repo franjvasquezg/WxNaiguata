@@ -153,11 +153,11 @@ f_menuCAB ()
    echo "*******************************************************************************"
    echo "*                       SISTEMA DE GESTION DE COMERCIOS                  ${COD_AMBIENTE} *"
    if [ "$pEntAdq" = "BM" ]; then
-      echo "*                  Incoming de MasterCard (Banco Mercantil)                   *"
+      echo "*         Incoming de Naiguata MasterCard (Banco Mercantil)                   *"
    elif [ "$pEntAdq" = "BP" ]; then
-        echo "*                  Incoming de MasterCard (Banco Provincial)                  *"
+        echo "*         Incoming de Naiguata MasterCard (Banco Provincial)                  *"
    elif [ "$pEntAdq" = "TODOS" ]; then
-        echo "*                  Incoming de MasterCard (GENERAL)                           *"
+        echo "*         Incoming de Naiguata MasterCard (GENERAL)                           *"
    fi
    echo "*******************************************************************************"
 
@@ -357,7 +357,7 @@ while ( test -z "$vOpcion" || true ) do
    fi
 
 
-   # CARGA DE INCOMING DEBITO MAESTRO NAIGUATA 
+   # CARGA DE INCOMING DEBITO NAIGUATA MAESTRO NAIGUATA 
    ###########################################################################################
    #  INICIO OPCION "TODOS"
    ###########################################################################################
@@ -389,7 +389,7 @@ while ( test -z "$vOpcion" || true ) do
          f_msg "--------------------------------------------------------------------------------" N S
       fi
       f_msg
-      f_msg " Proceso: CARGA DE INCOMING DEBITO MAESTRO" N S
+      f_msg " Proceso: CARGA DE INCOMING NAIGUATA DEBITO MAESTRO" N S
       f_msg
       f_msg
       f_fechora $vFecProc
@@ -403,12 +403,15 @@ while ( test -z "$vOpcion" || true ) do
       then
          case $COD_AMBIENTE in
             DESA)
+              COD_AMBIENTEm="ccal"
               vPrefijo="/TDD/Entrada"
               vPrefijo_Res="/TDD/Entrada/RESPALDO";;
             CCAL)
+              COD_AMBIENTEm="ccal"
               vPrefijo="/TDD/Entrada"
               vPrefijo_Res="/TDD/Entrada/RESPALDO";;
             PROD)
+              COD_AMBIENTEm="prod"
               vPrefijo="/TDD/Entrada"
               vPrefijo_Res="/TDD/Entrada/RESPALDO";;
          esac
@@ -433,8 +436,10 @@ while ( test -z "$vOpcion" || true ) do
             do
               case $vEntAdq in
                  BM)
+                   vEntAdqm=bm
                    vEndPoint=0275;;
                  BP)
+                   vEntAdqm=bp
                    vEndPoint=0313;;
               esac
               vFileINCMAESTRO="SGCPINCMC${vEntAdq}.INCMAESTRONGTA.${vFecProc}"
@@ -498,7 +503,16 @@ while ( test -z "$vOpcion" || true ) do
                     tput setf 7
                     sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_${vARCHINC[$vADQIDX]}_Adquiriente_$vEntAdq - ${vEndPoint}"
                  else
-                    echo "Archivo ${vARCHINC[$vADQIDX]} Transferido Correctamente"
+                    echo "Archivo ${vARCHINC[$vADQIDX]} Transferido Correctamente" >> $vFileLOG 2>&1
+                    echo "Archivo ${vARCHINC[$vADQIDX]} Transferido Correctamente" 
+                    echo
+                    echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
+                    echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" 
+                    scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                    echo
+                    echo "Análisis archivo ${vARCHINC[$vADQIDX]} si trae datos para su procesaiento (Encabezado y Fin de Archivo)" >> $vFileLOG 2>&1
+                    echo "Análisis archivo ${vARCHINC[$vADQIDX]} si trae datos para su procesaiento (Encabezado y Fin de Archivo)" 
+                    echo
                     vENCABEZADO=`head -1 $DIRIN/$vArchDest | awk '{print substr($0,0,4)}'`
                     # Buscar el footer y lo almacena en la variable --> vFOOTER
                     find_footer $vArchDest           
@@ -516,7 +530,7 @@ while ( test -z "$vOpcion" || true ) do
                     fi
                  fi
               
-               #  PREOCESAMIENTO Y CARGA EN BD DE ARCHIVOS T464NA  NAIGUATA
+               #  PROCESAMIENTO Y CARGA EN BD DE ARCHIVOS T464NA  NAIGUATA
 				 
                  if [ "$vCONSIST" = "0" ]
                  then
@@ -541,7 +555,7 @@ while ( test -z "$vOpcion" || true ) do
                         echo
                         echo "         Archivo de Control : `basename ${vFileCTL}`"
                         echo "                 Directorio : `dirname ${vFileCTL}`"
-                        echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+                        echo "           LOG de Ejecucion : `basename ${vFileLOG}`"
                         echo "                 Directorio : `dirname ${vFileLOG}`"
                         echo "    Archivo LOG del Proceso : ${vFileINCMAESTRO}.LOG"
                         echo "                 Directorio : ${DIRLOG}"
@@ -554,8 +568,7 @@ while ( test -z "$vOpcion" || true ) do
                            then
                            #vArchDestB="${vpValRet_6}${vEndPoint}_${vFecJul}_01_conv"
                            #Se envía transferencia al XCOM del archivo convertido - Retomado en el IPR 1156 Fase IV
-                           #scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:${vEntAdq}pu_fileout/$vArchDestB
-                           scp -Bq $DIRIN/$vArchDest $SSSSH_USER@$FTP_HOSTXCOM:/file_transfer/${COD_AMBIENTE}/${vEntAdq}/file_out
+                           scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/${COD_AMBIENTEm}/${vEntAdqm}/file_out
                            vSTATT=$?
                            if [ "$vSTATT" != "0" ]
                               then
@@ -564,13 +577,16 @@ while ( test -z "$vOpcion" || true ) do
                                  tput setf 7
                                  sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
                            else
-                              echo "Archivo Transferido correctamente al area de acceso de los Bancos"
-                              echo
-                              echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
-                              echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" 
-                              scp -Bq $DIRIN/$vArchDest ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                              echo "Archivo Naiguata Transferido correctamente al area de acceso de los Bancos" >> $vFileLOG 2>&1
+                              echo "Archivo Naiguata Transferido correctamente al area de acceso de los Bancos"
+                              #echo
+                              #echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
+                              #echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" 
+                              #scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
 
                            fi  ####Fin de la modificación GlobalR IPR1156
+                           echo "Proceso de carga T464NA Finalizado creardo Backup de Archivo" >> $vFileLOG 2>&1
+                           echo "Proceso de carga T464NA Finalizado creardo Backup de Archivo"
                            mv $DIRIN/$vArchDest $DIRIN/${vArchDest}_bkp
                            mv $DIRIN/$vArchDest_conv $DIRIN/${vArchDest_conv}_bkp
                         fi
@@ -598,8 +614,10 @@ while ( test -z "$vOpcion" || true ) do
             stty intr 
             case $pEntAdq in
                BM)
+                 pEntAdqm=bm
                  vEndPoint=0275;;
                BP)
+                 pEntAdqm=bp
                  vEndPoint=0313;;
             esac
             f_fechora $vFecProc
@@ -675,15 +693,24 @@ while ( test -z "$vOpcion" || true ) do
                      tput setf 7
                      sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_${vARCHINC}_Adquiriente_$pEntAdq - ${vEndPoint}"
                   else
-                    echo "Archivo $vARCHINC Transferido Correctamente"
+                    echo "Archivo $vARCHINC Transferido Correctamente" >> $vFileLOG 2>&1
+                    echo "Archivo $vARCHINC Transferido Correctamente" 
+                    echo
+                    echo "Respaldando archivos $vARCHINC - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
+                    echo "Respaldando archivos $vARCHINC - ${vPrefijo_Res} en Servidor MQFTE" 
+                    scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                    echo
+                    echo "Análisis archivo $vARCHINC si trae datos para su procesaiento (Encabezado y Fin de Archivo)" >> $vFileLOG 2>&1
+                    echo "Análisis archivo $vARCHINC si trae datos para su procesaiento (Encabezado y Fin de Archivo)" 
+                    echo
                     vENCABEZADO=`head -1 $DIRIN/$vArchDest | awk '{print substr($0,0,4)}'`
                     #vFOOTER=`tail -2 $DIRIN/$vArchDest | head -1 | awk '{print substr($0,0,4)}'`
-                    find_footer $vArchDest
+                    find_footer $vArchDest  #FUNCION QUE VALIDA SI TRAE FIN DE ARCHIVO
 
-                    echo "Antes de Validar"
-                    echo "vENCABEZADO " $vENCABEZADO
-                    echo "vFOOTER " $vFOOTER
-                    echo " vArchDest "  $vArchDest
+                    #echo "Antes de Validar"
+                    #echo "vENCABEZADO " $vENCABEZADO
+                    #echo "vFOOTER " $vFOOTER
+                    #echo " vArchDest "  $vArchDest
 
                     if [ "$vENCABEZADO" = "FHDR" ] && [ "$vFOOTER" = "FTRL" ]
                     then
@@ -722,7 +749,7 @@ while ( test -z "$vOpcion" || true ) do
                      echo
                      echo "         Archivo de Control : `basename ${vFileCTL}`"
                      echo "                 Directorio : `dirname ${vFileCTL}`"
-                     echo "   Archivo LOG de Ejecucion : `basename ${vFileLOG}`"
+                     echo "           LOG de Ejecucion : `basename ${vFileLOG}`"
                      echo "                 Directorio : `dirname ${vFileLOG}`"
                      echo "    Archivo LOG del Proceso : ${vFileINCMAESTRO}.LOG"
                      echo "                 Directorio : ${DIRLOG}"
@@ -735,21 +762,24 @@ while ( test -z "$vOpcion" || true ) do
                      then
                          #vArchDestB="${vpValRet_6}${vEndPoint}_${vFecJul}_01_conv"
 			 #			      #IPR 1156 GlobalR Fase IV se descomenta Elimininado por IPR1156
-                         scp -Bq $DIRIN/$vArchDest $SSSSH_USER@$FTP_HOSTXCOM:/file_transfer/${COD_AMBIENTE}/${vEntAdq}/file_out
+                         scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/${COD_AMBIENTEm}/${pEntAdqm}/file_out
                          vSTATT=$?
                          if [ "$vSTATT" != "0" ]
                          then
                            tput setf 8
-                           echo "error en la transferencia del archivo $vArchDest del adquiriente $pEntAdq al area de acceso de los Bancos, favor revisar" | tee -a $vFileLOG
+                           echo "Error en la transferencia del archivo $vArchDest del adquiriente $pEntAdq al area de acceso de los Bancos, favor revisar" | tee -a $vFileLOG
                            tput setf 7
                            sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$pEntAdq"
                          else
+                           echo "Archivo Transferido correctamente al area de acceso de los Bancos" >> $vFileLOG 2>&1
                            echo "Archivo Transferido correctamente al area de acceso de los Bancos"
                            echo
-                           echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
-                           echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" 
-                           scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                           #echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
+                           #echo "Respaldando archivos T464NA procesados - ${vPrefijo_Res} en Servidor MQFTE" 
+                           #scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
                          fi # Fin de la eliminación de transferencia de archivo convertido al area de los bancos IPR1156
+                          echo "Proceso de carga T464NA Finalizado creardo Backup de Archivo" >> $vFileLOG 2>&1
+                          echo "Proceso de carga T464NA Finalizado creardo Backup de Archivo"
                           mv $DIRIN/$vArchDest $DIRIN/${vArchDest}_bkp
                           mv $DIRIN/$vArchDest_conv $DIRIN/${vArchDest_conv}_bkp
                      fi
