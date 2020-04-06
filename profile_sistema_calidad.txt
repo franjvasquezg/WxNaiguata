@@ -14,7 +14,7 @@ export ID_UNIQ
 # ------------------------------------------------------------------------------
 # Definicion de Directorios
 # ------------------------------------------------------------------------------
-HOME=/export/home/tstprod
+HOME=/export/home/tstccal
 export HOME
 
 # Directorio del Sistema
@@ -38,73 +38,55 @@ DIRSGCBH=$HOME/SGCEXPBH
 export DIRSGCBD DIRSGCBS DIRSGCBH
 
 # Directorios en Stratus
-DIRSTRDAT="#d31>expl>datos"
-DIRSTRCLR="#d31>expl>clearing"
-DIRSTRIN="#d31>expl>datos>pase-sun"
-DIRSTROUT="#d31>expl>datos>pase-sun"
-DIRSTRRPT="#d31>expl>reportes"
-export DIRSTRDAT DIRSTRCLR DIRSTRIN DIRSTROUT DIRSTRRPT
-
-# ------------------------------------------------------------------------------
-# Directorios en Stratus TMPVNZ
-# ------------------------------------------------------------------------------
-DIRSTRDAT_TMPVNZ="#d12>ccal>datos"
-DIRSTRCLR_TMPVNZ="#d12>ccal>clearing"
-DIRSTRIN_TMPVNZ="#d12>ccal>datos>pase-sun"
-DIRSTRBKP_TMPVNZ="#d12>ccal>lotes>backup"
-DIRSTROUT_TMPVNZ="#d12>ccal>datos>pase-sun"
-DIRSTRRPT_TMPVNZ="#d12>ccal>reportes"
-DIRSTRREC_TMPVNZ="#d12>ccal>rechazos"
-export DIRSTRDAT_TMPVNZ DIRSTRCLR_TMPVNZ DIRSTRIN_TMPVNZ DIRSTROUT_TMPVNZ DIRSTRRPT_TMPVNZ DIRSTRBKP_TMPVNZ DIRSTRREC_TMPVNZ
-
-# -----------------------------------------------------------------------------
-# FTP TMPVNZ
-# -----------------------------------------------------------------------------
-FTP_HOSTSTR_TMPVNZ="10.161.80.30"
-FTP_USERSTR_TMPVNZ="uftpccal.SysAdmin uftpccal"
-export FTP_HOSTSTR_TMPVNZ FTP_USERSTR_TMPVNZ
+DIRSTRDAT="#d11>ccal>datos"
+DIRSTRCLRSFTP="/#d11/ccal/clearing"
+DIRSTRCLR="#d11>ccal>clearing"
+DIRSTRIN="#d11>ccal>datos>pase-sun"
+DIRSTRBKP="#d11>ccal>lotes>backup"
+DIRSTROUT="#d11>ccal>datos>pase-sun"
+DIRSTRRPT="#d11>ccal>reportes"
+DIRSTRREC="#d11>ccal>rechazos"
+export DIRSTRDAT DIRSTRCLR DIRSTRIN DIRSTROUT DIRSTRRPT DIRSTRBKP DIRSTRREC
 
 # ------------------------------------------------------------------------------
 # Conexion a Base de Datos
 # ------------------------------------------------------------------------------
-DBSGC=sgcvnz/LEGS5FU+8ITORM4C@tstprod
-DBSGD=sgdvnz/BJvwjYQd1IyX5pF+@tstprod
-DBCEL=celvnz/TsT69BComOn10TsT+-@celprod
-DBRBD=usrexpimp/ovc54Q+tn8qmJ7PZ@tstprod
-DBRMCY=usrexpimp/ovc54Q+tn8qmJ7PZ@TSTPRDMCY01
-DBRSMA=usrexpimp/ovc54Q+tn8qmJ7PZ@TSTBD2
-DBRCEL=usrexpimp/ovc54Q+tn8qmJ7PZ@CELPROD
-DBSEG=usrutlseg/YchRaLj5A2JxkIU+@tstprod
-DBTMPVNZ=tmpvnz/Ktrf711e3570050543ce5++@tstprod
-export DBSGC DBSGD DBCEL DBRBD DBSEG DBTMPVNZ DBRSMA DBRMCY
+DBSGC=/@TSTSGC
+DBSGD=/@TSTSGD
+DBCEL=/@TSTCEL
+DBRBD=/@TSTCCAL_EXPIMP
+DBSEG=/@TSTUTL
+### COLOCADO DE FORMA TEMPORAL PARA CONEXION A PRODUCCION 
+DBRCELP=usrexpimp/ovc54Q+tn8qmJ7PZ@CELPROD
+DBRSMAP=usrexpimp/ovc54Q+tn8qmJ7PZ@TSTBD2P
+DBRBDP=usrexpimp/ovc54Q+tn8qmJ7PZ@tstprod
+export DBSGC DBSGD DBCEL DBRBD DBSEG DBRCELP DBRSMAP DBRBDP
 
 
 # ------------------------------------------------------------------------------
 # FTP
 # ------------------------------------------------------------------------------
-FTP_HOSTSTR="10.161.80.20"
-FTP_USERSTR="uftpprod.SysAdmin uftpprod"
-FTP_HOSTXCOM="10.161.80.21"
-FTP_USERXCOM="sgcprod sgcprod"
-FTP_HOSTXCOMMC="10.161.80.21"
-FTP_USERXCOMMC="uftpmc uftpmc"
-FTP_HOSTCEL="10.161.80.22"
-FTP_USERCEL="icelprod 1c3lpr0d+"
+FTP_HOSTSTR="10.161.80.169"
+FTP_USERSTR="uftpccal.SysAdmin uftpccal"
+FTP_HOSTXCOM="10.161.80.104"
+FTP_USERXCOM="sgcccal sgcccal"
+FTP_HOSTXCOMMC="10.161.80.104"
+FTP_USERXCOMMC="uftpmc_c uftpmc_c"
+FTP_HOSTCEL="10.161.80.101"
+FTP_USERCEL="icelccal Qwert01++"
 FTP_HOSTCNTG=""
 FTP_USERCNTG=""
-# Variables Agregadas por Pase a Produccion de Cierre Automatico
 #SFTP_VISA="10.160.162.183"
 SFTP_VISA="10.161.80.142"
+#SFTP_MC="10.160.162.184"
 SFTP_MC="10.161.80.13"
-PSFTP_MC="/OUTGOING/PROD"
+PSFTP_MC="/OUTGOING/TEST"
 SFTP_IMC="10.161.80.13"
-SFTP_CM="10.161.80.38"
-SSSH_USER="sgcprod"
-SFTP_USER="cierrep"
-
+SFTP_CM="10.161.80.14"
+SSSH_USER="sgcccal"
+SFTP_USER="cierreq"
 export FTP_HOSTSTR FTP_USERSTR FTP_HOSTXCOM FTP_USERXCOM FTP_HOSTXCOMMC FTP_USERXCOMMC
-export FTP_HOSTCEL FTP_USERCEL FTP_HOSTCNTG FTP_USERCNTG
-# Variables Agregadas por Pase a Produccion de Cierre Automatico
+export FTP_HOSTCEL FTP_USERCEL FTP_HOSTCNTG FTP_USERCNTG 
 export SSSH_USER SFTP_USER SFTP_VISA
 export SFTP_MC SFTP_CM SFTP_IMC PSFTP_MC
 
@@ -112,18 +94,17 @@ export SFTP_MC SFTP_CM SFTP_IMC PSFTP_MC
 # ------------------------------------------------------------------------------
 # DEFAULTS
 # ------------------------------------------------------------------------------
-COD_AMBIENTE=PROD
+COD_AMBIENTE=CCAL
 DBUSER=sgcvnz
-DBPASS=prod
-DBTNS=tstprod
+DBPASS=ccal
+DBTNS=tstccal
 DB=$DBSGC
 STDUSR=SGCVNZ
 SGCFLGCNTG=N
 SGCDEBUG=N
 FILE_CRON=$HOME/cron/crontab
 NUMMAXTAILS=10
-#COD_TIPOARCHMC="057067068112113655464"
-COD_TIPOARCHMC="057067068112113655464140461"
+COD_TIPOARCHMC="058167168120121655470150467"
 PCLRLOADPROC_NUMMAXINT=2
 PCLRLOADPROC_MINSJOB=5
 PCLRLOAD_NUMMAXINT=2
@@ -137,21 +118,20 @@ export PCAMADQ_MINSJOB
 # ------------------------------------------------------------------------------
 # DEFAULTS - Naiguata
 # ------------------------------------------------------------------------------
-COD_TIPOARCHMC_NGTA="112113655464140461SWCHD"
-SFTP_IMC_NGTA="10.161.80.118"
-COD_AMBIENTE2="Produccion"
+COD_TIPOARCHMC_NGTA="112113655464140461SWCHDA"
+SFTP_IMC_NGTA="10.161.80.37"
+COD_AMBIENTE2="Calidad"
 
 export COD_TIPOARCHMC_NGTA COD_AMBIENTE2
 export SFTP_IMC_NGTA
 
-
 # ------------------------------------------------------------------------------
 # Entorno ORACLE
 # ------------------------------------------------------------------------------
-ORACLE_SID=TSTPROD
-ORACLE_BASE=/oracle
-#ORACLE_HOME=/oracle/product/10.2.0/Db_2
-ORACLE_HOME=/oracle/app/oracle/product/11.2.0/dbhome_1
+#ORACLE_SID=tstccal
+ORACLE_SID=TSTCCAL
+ORACLE_BASE=/oracle/app18c
+ORACLE_HOME=/oracle/app18c/product/18.0.0/dbhome_1
 ORACLE_PATH=$ORACLE_HOME/bin
 ORACLE_TERM=tandm
 LD_LIBRARY_PATH=$ORACLE_HOME/lib:/opt/SUNWspro/lib:/lib:
@@ -165,26 +145,24 @@ export ORACLE_TERM LD_LIBRARY_PATH TRACE
 # ------------------------------------------------------------------------------
 PATH=.:$DIRSGC/bin:$ORACLE_PATH
 PATH=$PATH:/usr/bin:/usr/ucb:/etc:/opt/SUNWspro/bin:/usr/ccs/bin
-PATH=$PATH:/opt/FSFgzip/bin:/usr/local/bin
-PATH=$PATH:/UTILIDADES
+PATH=$PATH:/opt/FSFgzip/bin:/usr/local/bin:/export/home/tstccal/bin
 MANPATH=/opt/SUNWspro/man:/usr/man
 export PATH MANPATH
 
 # Modificado el dia 26/08/2014 para forzar el uso configuracion regional en_US
-LANG=en_US.ISO8859-15;export LANG
-LC_ALL=en_US.ISO8859-15;export LC_ALL
-
+#LANG=en_US.ISO8859-15;export LANG
+#LC_ALL=en_US.ISO8859-15;export LC_ALL
 
 # ------------------------------------------------------------------------------
 # Entorno MPOS - 02Mar2017
 # ------------------------------------------------------------------------------
 # Directorios de Trabajo
-#SFTP_DIR_ACT="get /PROD/file_in/MA`date +%y%m%d`*.txt"
-PAS_DIR_ACT="get /PROD/file_in/"
-SFTP_DIR_COM="/PROD/file_out"
+#SFTP_DIR_ACT="get /CCAL/file_in/MA`date +%y%m%d`*.txt"
+PAS_DIR_ACT="get /CCAL/file_in/"
+SFTP_DIR_COM="/CCAL/file_out"
 
 # FTP
-SFTP_MPOS_PASARELA="mposp@10.161.81.237"
+SFTP_MPOS_PASARELA="mposq@10.161.81.237"
 OPER_SFTP_COM="put /${DIROUT}/"
 USERMPOS="MposVenezuela"
 CLAVEMPOS="1q2w3e"
