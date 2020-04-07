@@ -110,6 +110,23 @@ else
 fi
 }
 
+# f_fechora_Ses | cambia el formato de la fecha Sesión
+#                 YYYYMMDD > DD-MM-YYYY
+# Parametros
+#   pFH : vFecSes
+################################################################################
+f_fechora_Ses ()
+{
+pFH="$1"
+vLong=`echo ${pFH} | awk '{print length($0)}'`
+case ${vLong} in
+     8)  # Fecha
+         vDia=`echo $pFH | awk '{print substr($0,7,2)}'`
+         vMes=`echo $pFH | awk '{print substr($0,5,2)}'`
+         vAno=`echo $pFH | awk '{print substr($0,1,4)}'`
+         vpValRet="${vDia}-${vMes}-${vAno}";;
+esac
+}
 
 # f_fechora | cambia el formato de la fecha y hora
 #             YYYYMMDD > DD/MM/YYYY
@@ -993,11 +1010,13 @@ while ( test -z "$vOpcion" || true ) do
 
       vFlgOpcErr="S"
 
-FechaREP=`sqlplus -s $DB << !
-set head off
-set pagesize 0000
-select to_char(to_date('$vFecSes','YYYYMMDD'),'DD-MON-YYYY') from dual;
-!`
+f_fechora_Ses $vFecSes
+FechaREP=${vpValRet}
+#FechaREP=`sqlplus -s $DB << !
+#set head off
+#set pagesize 0000
+#select to_char(to_date('$vFecSes','YYYYMMDD'),'DD-MON-YYYY') from dual;
+#!`
       echo
       echo " REPORTE COMPENSACION PLATCO | Seleccione el Adquirente:"
       echo
