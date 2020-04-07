@@ -139,7 +139,6 @@ export PCAMADQ_MINSJOB
 # ------------------------------------------------------------------------------
 COD_TIPOARCHMC_NGTA="112113655464140461SWCHD"
 SFTP_IMC_NGTA="10.161.80.118"
-COD_AMBIENTE2="Produccion"
 
 export COD_TIPOARCHMC_NGTA COD_AMBIENTE2
 export SFTP_IMC_NGTA
