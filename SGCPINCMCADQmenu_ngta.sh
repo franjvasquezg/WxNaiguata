@@ -1651,7 +1651,7 @@ while ( test -z "$vOpcion" || true ) do
       vOpcion=""
 
       f_msg
-      f_msg " Proceso: REPORTE DEBITO MAESTRO - SWCHD " N S
+      f_msg " Proceso: REPORTE DEBITO NAIGUATA MAESTRO - SWCHD " N S
       f_msg
       f_msg
       f_fechora $vFecProc
@@ -1673,11 +1673,20 @@ while ( test -z "$vOpcion" || true ) do
       then
          case $COD_AMBIENTE in
             DESA)
-              vPrefijo="/TDD/Entrada";;
+              COD_AMBIENTEm="ccal"
+              COD_AMBIENTE2="Calidad"
+              vPrefijo="/TDD/Entrada"
+              vPrefijo_Res="/TDD/Entrada/RESPALDO";;
             CCAL)
-              vPrefijo="/TDD/Entrada";;
+              COD_AMBIENTEm="ccal"
+              COD_AMBIENTE2="Calidad"
+              vPrefijo="/TDD/Entrada"
+              vPrefijo_Res="/TDD/Entrada/RESPALDO";;
             PROD)
-              vPrefijo="/TDD/Entrada";;
+              COD_AMBIENTEm="prod"
+              COD_AMBIENTE2="Produccion"
+              vPrefijo="/TDD/Entrada"
+              vPrefijo_Res="/TDD/Entrada/RESPALDO";;
          esac
          vPrefijoWin=`echo $vPrefijo | sed -e 's/\///'`   ## quita la primera "/"
          #vPrefijoWin="\Procesos\Compensacion Naiguata-MC"
@@ -1703,9 +1712,11 @@ while ( test -z "$vOpcion" || true ) do
             do
                case $vEntAdq in
                   BM)
+                     vEntAdqm=bm
                      vEndPoint=0275
                      vEntAdq2=0105;;
                   BP)
+                     vEntAdqm=bp
                      vEndPoint=0313
                      vEntAdq2=0108;;
                esac
@@ -1747,7 +1758,7 @@ while ( test -z "$vOpcion" || true ) do
                         else
                            #vArchDestB="${vpValRet_9}${vEndPoint}_${vFecJul}_01_conv"
                            vArchDestB="${vpValRet_10}${SWTIPO}_${vEndPoint}_${vEntAdq2}_${vNomFile_SecA}_${vFecJul}_$vFecProc" ## Con la fecha de proceso IPR1302
-                           scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/$COD_AMBIENTE/${vEntAdq}/file_out  ##/$vArchDest
+                           scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/$COD_AMBIENTEm/${vEntAdqm}/file_out  ##/$vArchDest
                            vSTATT=$?
                            if [ "$vSTATT" != "0" ]
                            then
@@ -1756,7 +1767,14 @@ while ( test -z "$vOpcion" || true ) do
                               tput setf 7
                               sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
                            else
+                              echo "Archivo Transferido correctamente al area de acceso de los Bancos" >> $vFileLOG 2>&1
                               echo "Archivo Transferido correctamente al area de acceso de los Bancos"
+                              echo
+                              echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
+                              echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" 
+                              scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                              echo
+                              echo "Transfiriendo Archivo al disco R de GERENCIATST" >> $vFileLOG 2>&1
                               echo "Transfiriendo Archivo al disco R de GERENCIATST"
                               vRUTAWIN1="$vPrefijoWin\\${vARCHINC[$vADQIDX]}"                                         ## $COD_AMBIENTE2   NUEVA VARIABLE DE AMBIENTE IPR1302
                               vRUTAWIN2="\\Procesos\\Compensacion Naiguata-MC\\${COD_AMBIENTE2}\\T461NA\\$vArchDestB" ## $vpValRet_910\\$vArchDestB"
@@ -1768,9 +1786,9 @@ while ( test -z "$vOpcion" || true ) do
                                  echo "error en la transferencia del archivo $vArchDest del adquiriente $vEntAdq al Disco R de SRVCCSALC, favor revisar" | tee -a $vFileLOG
                                  echo $vCOPIAWIN | tee -a $vFileLOG
                                  tput setf 7
-                                 sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
+                                 sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
                               else
-                                 echo "Archivo ${vARCHINC[$vADQIDX]} transferido correctamente al Servidor SRVCCSALC (J)"
+                                 echo "Archivo ${vARCHINC[$vADQIDX]} transferido correctamente al Servidor SRVCCSALC (R)"
                               fi
                            fi
                            echo " "
@@ -1794,9 +1812,11 @@ while ( test -z "$vOpcion" || true ) do
          else
             case $pEntAdq in
                BM)
+                  vEntAdqm=bm
                   vEndPoint=0275
                   vEntAdq2=0105;;
                BP)
+                 vEntAdqm=bp
                  vEndPoint=0313
                  vEntAdq2=0108;;
             esac
@@ -1848,8 +1868,9 @@ while ( test -z "$vOpcion" || true ) do
                      tput setf 7
                      sqlplus -s $DB @$DIRBIN/alertacie INC REPMAESTRO-NGTA "Error_Transferencia_de_Archivo_${vARCHINC[$vADQIDX]}_Adquiriente_$pEntAdq"
                   else
-                     vArchDestB="${vpValRet_9}${vEndPoint}_${vFecJul}_01_conv"
-                     scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:${pEntAdq}pu_fileout/$vArchDestB
+                     ##vArchDestB="${vpValRet_9}${vEndPoint}_${vFecJul}_01_conv"
+                     vArchDestB="${vpValRet_10}${SWTIPO}_${vEndPoint}_${vEntAdq2}_${vNomFile_SecA}_${vFecJul}_$vFecProc" ## Con la fecha de proceso IPR1302
+                     scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/$COD_AMBIENTEm/${vEntAdqm}/file_out
                      vSTATT=$?
                      if [ "$vSTATT" != "0" ]
                      then
@@ -1858,9 +1879,15 @@ while ( test -z "$vOpcion" || true ) do
                         tput setf 7
                         sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$pEntAdq"
                      else
+                        echo "Archivo Transferido correctamente al area de acceso de los Bancos" >> $vFileLOG 2>&1
                         echo "Archivo Transferido correctamente al area de acceso de los Bancos"
+                        echo
+                        echo "Respaldando archivos ${vARCHINC} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
+                        echo "Respaldando archivos ${vARCHINC} - ${vPrefijo_Res} en Servidor MQFTE" 
+                        scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                        echo
                         echo "Transfiriendo Archivo al disco R de GERENCIATST"
-                        vRUTAWIN1="$vPrefijoWin\\${vARCHINC}"                                                   ## $COD_AMBIENTE2   NUEVA VARIABLE DE AMBIENTE IPR1302
+                        vRUTAWIN1="$vPrefijoWin\\${vARCHINC}"                                                   ## $COD_AMBIENTE2    IPR1302
                         vRUTAWIN2="\\Procesos\\Compensacion Naiguata-MC\\${COD_AMBIENTE2}\\T461NA\\$vArchDestB" ## $vpValRet_910\\$vArchDestB"
                         vCOPIAWIN=`ssh ${SFTP_USER}@${SFTP_IMC_NGTA} cmd.exe /C "C:\\MFESFTP\\transtmve $vRUTAWIN1 $vPrefijoWin $vRUTAWIN2 $USUARIOTMVE $CLAVETMVE"`
                         vSTATT=$?
