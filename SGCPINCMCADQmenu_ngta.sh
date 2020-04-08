@@ -357,7 +357,7 @@ while ( test -z "$vOpcion" || true ) do
    fi
 
 
-   # CARGA DE INCOMING DEBITO NAIGUATA MAESTRO NAIGUATA 
+   # CARGA DE INCOMING DEBITO NAIGUATA MAESTRO
    ###########################################################################################
    #  INICIO OPCION "TODOS"
    ###########################################################################################
@@ -508,10 +508,18 @@ while ( test -z "$vOpcion" || true ) do
                     echo
                     echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
                     echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" 
-                    scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                    #scp -Bq $DIRIN/$vArchDest ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                    echo "rm ${vPrefijo_res}/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                    echo "rename ${vPrefijo}/${vARCHINC[$vADQIDX]} ${vPrefijo_res}/${vARCHINC[$vADQIDX]}" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                    sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
                     echo
-                    echo "Análisis archivo ${vARCHINC[$vADQIDX]} si trae datos para su procesaiento (Encabezado y Fin de Archivo)" >> $vFileLOG 2>&1
-                    echo "Análisis archivo ${vARCHINC[$vADQIDX]} si trae datos para su procesaiento (Encabezado y Fin de Archivo)" 
+                    echo "Eliminando registro ${vARCHINC[$vADQIDX]} - en - ${vPrefijo} en Servidor MQFTE" >> $vFileLOG 2>&1
+                    echo "Eliminando registro ${vARCHINC[$vADQIDX]} - en - ${vPrefijo} en Servidor MQFTE"
+                    echo "rm $vPrefijo/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
+                    sftp -b $DIRTMP/$dpNom$vFecProc.PARRM.SFTP ${SFTP_USER}@$SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                    echo
+                    echo "Análisis archivo ${vARCHINC[$vADQIDX]} si trae datos para su procesamiento (Encabezado y Fin de Archivo)" >> $vFileLOG 2>&1
+                    echo "Análisis archivo ${vARCHINC[$vADQIDX]} si trae datos para su procesamiento (Encabezado y Fin de Archivo)" 
                     echo
                     vENCABEZADO=`head -1 $DIRIN/$vArchDest | awk '{print substr($0,0,4)}'`
                     # Buscar el footer y lo almacena en la variable --> vFOOTER
@@ -698,7 +706,15 @@ while ( test -z "$vOpcion" || true ) do
                     echo
                     echo "Respaldando archivos $vARCHINC - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
                     echo "Respaldando archivos $vARCHINC - ${vPrefijo_Res} en Servidor MQFTE" 
-                    scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                    #scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                    echo "rm ${vPrefijo_res}/${vARCHINC}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                    echo "rename ${vPrefijo}/${vARCHINC} ${vPrefijo_res}/${vARCHINC}" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                    sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                    echo
+                    echo "Eliminando registro ${vARCHINC} - en - ${vPrefijo} en Servidor MQFTE" >> $vFileLOG 2>&1
+                    echo "Eliminando registro ${vARCHINC} - en - ${vPrefijo} en Servidor MQFTE"
+                    echo "rm $vPrefijo/${vARCHINC}" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
+                    sftp -b $DIRTMP/$dpNom$vFecProc.PARRM.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
                     echo
                     echo "Análisis archivo $vARCHINC si trae datos para su procesaiento (Encabezado y Fin de Archivo)" >> $vFileLOG 2>&1
                     echo "Análisis archivo $vARCHINC si trae datos para su procesaiento (Encabezado y Fin de Archivo)" 
@@ -1771,8 +1787,17 @@ while ( test -z "$vOpcion" || true ) do
                               echo "Archivo Transferido correctamente al area de acceso de los Bancos"
                               echo
                               echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
-                              echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" 
-                              scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                              echo "Respaldando archivos ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE"
+                              echo
+                              #scp -Bq $DIRIN/$vArchDest ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                              echo "rm ${vPrefijo_res}/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                              echo "rename ${vPrefijo}/${vARCHINC[$vADQIDX]} ${vPrefijo_res}/${vARCHINC[$vADQIDX]}" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                              sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                              echo
+                              echo "Eliminando registro ${vARCHINC[$vADQIDX]} - en - ${vPrefijo} en Servidor MQFTE" >> $vFileLOG 2>&1
+                              echo "Eliminando registro ${vARCHINC[$vADQIDX]} - en - ${vPrefijo} en Servidor MQFTE"
+                              echo "rm $vPrefijo/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
+                              sftp -b $DIRTMP/$dpNom$vFecProc.PARRM.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
                               echo
                               echo "Transfiriendo Archivo al disco R de GERENCIATST" >> $vFileLOG 2>&1
                               echo "Transfiriendo Archivo al disco R de GERENCIATST"
@@ -1802,6 +1827,7 @@ while ( test -z "$vOpcion" || true ) do
                done
             done
             rm $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+            rm $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
             DUMMY=0
             while [ "$DUMMY" != "Q" ] && [ "$DUMMY" != "q" ]
             do
@@ -1884,7 +1910,12 @@ while ( test -z "$vOpcion" || true ) do
                         echo
                         echo "Respaldando archivos ${vARCHINC} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
                         echo "Respaldando archivos ${vARCHINC} - ${vPrefijo_Res} en Servidor MQFTE" 
-                        scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                        #scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                        echo
+                        echo "rm ${vPrefijo_res}/${vARCHINC}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                        echo "rename ${vPrefijo}/${vARCHINC} ${vPrefijo_res}/${vARCHINC}" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                        sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                        echo
                         echo
                         echo "Transfiriendo Archivo al disco R de GERENCIATST"
                         vRUTAWIN1="$vPrefijoWin\\${vARCHINC}"                                                   ## $COD_AMBIENTE2    IPR1302
