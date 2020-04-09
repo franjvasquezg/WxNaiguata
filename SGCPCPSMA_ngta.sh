@@ -273,16 +273,16 @@ if [ "${pFecProc}" = "" ]; then
     pFecProc=`getdate`
 fi
 
-
 ## Archivos de Trabajo
 ## -------------------
-## File PROD: 464EEEEE_JJJ_SS_conv
-## File CCAL: 470EEEEE_JJJ_SS_conv
-## File DESA: 470EEEEE_JJJ_SS_conv
+## File PROD: T464NA_EEEE_IIII_S_JJJ  ##470EEEEE_JJJ_SS_conv
+## File CCAL: T470NA_EEEE_IIII_S_JJJ
+## File DESA: T470NA_EEEE_IIII_S_JJJ
 ##
-## EEEEE    : Endpoint , 01857 BM , 01858 BP
+## EEEE     : Procesador Adquiriente , 0275 BM , 0313 BP ##Equibalente al Endpoint
+## IIII     : Identidicador del Banco BM & BP, 0502 
+## S        : Último dígito del año en Curso
 ## JJJ      : Fecha Juliana
-## SS       : Secuencia
 ################################################################################
 
 f_msgtit I

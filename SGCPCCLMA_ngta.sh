@@ -275,12 +275,12 @@ fi
 
 ## Archivos de Trabajo
 ## -------------------
-## File PROD: T464_EEEE_IIII_S_JJJ  ##470EEEEE_JJJ_SS_conv
-## File CCAL: T470_EEEE_IIII_S_JJJ
-## File DESA: T470_EEEE_IIII_S_JJJ
+## File PROD: T464NA_EEEE_IIII_S_JJJ  ##470EEEEE_JJJ_SS_conv
+## File CCAL: T470NA_EEEE_IIII_S_JJJ
+## File DESA: T470NA_EEEE_IIII_S_JJJ
 ##
 ## EEEE     : Procesador Adquiriente , 0275 BM , 0313 BP ##Equibalente al Endpoint
-## IIII     : Identidicador del Banco, 0105 BM, 0108 BP
+## IIII     : Identidicador del Banco BM & BP, 0502 
 ## S        : Último dígito del año en Curso
 ## JJJ      : Fecha Juliana
 ################################################################################
