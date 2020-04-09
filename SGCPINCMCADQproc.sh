@@ -361,7 +361,7 @@ fi
 ## Descripcion del Programa
 ################################################################################
 if [ "${pCodProc}" = "INCMAESTRONGTA" ]; then
-   dpDesc="Carga de Incoming de Naiguata MasterCard (${vEntAdq}:${pCodProc})"
+   dpDesc="Carga de INC NGTA Debito Maestro (${vEntAdq}:${pCodProc})"
 else
    dpDesc="Carga de Incoming de MasterCard (${vEntAdq}:${pCodProc})"
 fi
