@@ -13,6 +13,7 @@
 ##  ---------- ----- ------- ---------------------------------------------------
 ##  26/05/2008 JMG   2.00    Codigo Inicial
 ##  06/03/2013 DCB   2.00    Modificado para Incoming Automatico
+##  12/04/2020 LN    3.00    Entradas de LOG NAIGUATA IPR 1302
 ##
 ################################################################################
 
@@ -26,8 +27,8 @@
 
 dpNom="SGCPINCMCADQLOGmenu"   # Nombre del Programa
 dpDesc=""                     # Descripcion del Programa
-dpVer=2.00                    # Ultima Version del Programa
-dpFec="20080526"              # Fecha de Ultima Actualizacion [Formato:AAAAMMDD]
+dpVer=3.00                    # Ultima Version del Programa
+dpFec="20200412"              # Fecha de Ultima Actualizacion [Formato:AAAAMMDD]
 
 ## Variables del Programa
 ################################################################################
@@ -202,6 +203,10 @@ f_menuOPC ()
    vpValRet_8=${vpValRet}
    f_getCTAMC REPDEBMAESTRO
    vpValRet_9=${vpValRet}
+   f_getCTAMC INCMAESTRONGTA
+   vpValRet_10=${vpValRet}
+   f_getCTAMC REPDEBMAESTROSW
+   vpValRet_11=${vpValRet}
 
    echo "-------------------------------------------------------------------------------"
    echo
@@ -213,6 +218,8 @@ f_menuOPC ()
    echo "[ 4] LOG de Carga de Tipo de Cambio (${vpValRet_2})"
    echo "[ 5] LOG de Reporte Debito Maestro (${vpValRet_9})"
    echo "[ 6] LOG de Reporte de Credito Master Card (${vpValRet_8})"
+   echo "[ 7] LOG de Incoming Naiguata Maestro (T${vpValRet_10}NA)"
+   echo "[ 8] LOG de Reporte Debito Maestro Switch (${vpValRet_11})"
    echo
    echo "-------------------------------------------------------------------------------"
    echo " Ver $dpVer | Telefonica Servicios Transaccionales                     [Q] Salir"
@@ -245,6 +252,10 @@ elif [ "${pTipo}" = "REPCREDMC" ]; then
      vpValRet=`echo $COD_TIPOARCHMC | awk '{print substr($0,22,3)}'`
 elif [ "${pTipo}" = "REPDEBMAESTRO" ]; then
      vpValRet=`echo $COD_TIPOARCHMC | awk '{print substr($0,25,3)}'`
+elif [ "${pTipo}" = "INCMAESTRONGTA" ]; then
+     vpValRet=`echo $COD_TIPOARCHMC_NGTA | awk '{print substr($0,10,3)}'`
+elif [ "${pTipo}" = "REPDEBMAESTROSW" ]; then
+     vpValRet=`echo $COD_TIPOARCHMC_NGTA | awk '{print substr($0,19,5)}'`
 fi
 
 }
@@ -757,6 +768,132 @@ while ( test -z "$vOpcion" || true ) do
             read vContinua
          fi
    fi # Opcion 6 - LOG de Reporte Credito MasterCard
+  ################################################
+  # LOG DE INCOMING NAIGUATA MAESTRO - Opci�n 7
+  ################################################
+   if [ "$vOpcion" = "7" ]; then
+
+      vFlgOpcErr="N"
+      vOpcion=""
+         if [ "$pEntAdq" = "TODOS" ]
+         then
+            for vEntAdq in BM BP
+            do
+              vFileINCMAESTRO="SGCPINCMC${vEntAdq}.INCMAESTRONGTA.${vFecProc}"
+              vFileLOG="${DIRLOG}/${vFileINCMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
+              vFileCTL="${DIRDAT}/${vFileINCMAESTRO}.CTL"
+              if [ -f "${vFileCTL}" ]; then
+                vEstProc=`awk '{print substr($0,13,1)}' $vFileCTL`
+                case $vEstProc in
+                  P) echo
+                    f_fhmsg "El Proceso de Incoming Naiguata Maestro aun no ha sido ejecutado."
+                    echo
+                    echo "... presione [ENTER] para continuar."
+                    read vContinua;;
+                  X) echo
+                    f_fhmsg "Proceso de Incoming Naiguata Maestro en Ejecucion... [CTRL+C para salir del LOG]"
+                    echo
+                    trap "trap '' 2" 2
+                    tail -f $vFileLOG
+                    trap "";;
+                  *) echo
+                    vFileLOG=`ls -tr ${vFileLOG}*.LOG | tail -1`
+                    f_msg "Archivo LOG: $vFileLOG"
+                    echo
+                    cat $vFileLOG
+                    echo "... presione [ENTER] para continuar."
+                    read vContinua;;
+                esac
+              else
+                echo
+                f_fhmsg "El Proceso de Incoming Naiguata Maestro aun no ha sido ejecutado."
+                echo
+                echo "... presione [ENTER] para regresar."
+                read vContinua;
+              fi
+            done
+         else
+            vFileINCMAESTRO="SGCPINCMC${vEntAdq}.INCMAESTRONGTA.${vFecProc}"
+            vFileLOG="${DIRLOG}/${vFileINCMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
+            vFileCTL="${DIRDAT}/${vFileINCMAESTRO}.CTL"
+            if [ -f "${vFileCTL}" ]; then
+              vEstProc=`awk '{print substr($0,13,1)}' $vFileCTL`
+              case $vEstProc in
+                P) echo
+                  f_fhmsg "El Proceso de Incoming Naiguata Maestro aun no ha sido ejecutado."
+                  echo
+                  echo "... presione [ENTER] para continuar."
+                  read vContinua;;
+                X) echo
+                  f_fhmsg "Proceso de Incoming Naiguata Maestro en Ejecucion... [CTRL+C para salir del LOG]"
+                  echo
+                  vFileLOG=`ls -tr ${vFileLOG}*.LOG | tail -1`
+                  trap "trap '' 2" 2
+                  tail -f $vFileLOG
+                  trap "";;
+                *) echo
+                  vFileLOG=`ls -tr ${vFileLOG}*.LOG | tail -1`
+                  f_msg "Archivo LOG: $vFileLOG"
+                  echo
+                  cat $vFileLOG
+                  echo "... presione [ENTER] para continuar."
+                  read vContinua;;
+              esac
+            else
+              echo
+              f_fhmsg "El Proceso de Incoming Naiguata Maestro aun no ha sido ejecutado."
+              echo
+              echo "... presione [ENTER] para regresar."
+              read vContinua;
+            fi
+         fi
+   fi # Opcion 7 - LOG de Incoming Naiguata Maestro
+
+   ###############################################
+   # LOG DE REPORTE DE DEBITO MAESTRO - Opcion 8
+   ###############################################
+    
+   if [ "$vOpcion" = "8" ]; then
+
+      vFlgOpcErr="N"
+      vOpcion=""
+         if [ "$pEntAdq" = "TODOS" ]
+         then
+            for vEntAdq in BM BP
+            do
+              vFileINCREPDEBMAESTRO="SGCPINCMC${vEntAdq}.REPDEBMAESTRONGTA.${vFecProc}"
+              vFileLOG="${DIRLOG}/${vFileINCREPDEBMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
+              vFileLOG=`ls -tr ${vFileLOG}*.LOG 2>/dev/null | tail -1`
+              if [ -z "$vFileLOG" ]
+              then
+                 echo "Proceso de Copia de Archivo de Reporte de Debito Naiguata Maestro no ejecutado"
+              else
+                 f_msg "Archivo LOG: $vFileLOG"
+                 echo
+                 cat $vFileLOG
+                 echo
+              fi
+              echo "... presione [ENTER] para continuar."
+              read vContinua
+            done
+         else
+            vFileINCREPDEBMAESTRO="SGCPINCMC${pEntAdq}.REPDEBMAESTRONGTA.${vFecProc}"
+            vFileLOG="${DIRLOG}/${vFileINCREPDEBMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
+            vFileLOG=`ls -tr ${vFileLOG}*.LOG 2>/dev/null | tail -1`
+            if [ -z "$vFileLOG" ]
+            then
+               echo "Proceso de Copia de Archivo de Reporte de Debito Naiguata Maestro no ejecutado"
+            else
+               f_msg "Archivo LOG: $vFileLOG"
+               echo
+               cat $vFileLOG
+               echo
+            fi
+            echo "... presione [ENTER] para continuar."
+            read vContinua
+         fi
+   fi # Opcion 8 - LOG de Reporte Debito Naiguata Maestro
+
 
    if [ "$vFlgOpcErr" = "S" ]; then
       vOpcion=""
