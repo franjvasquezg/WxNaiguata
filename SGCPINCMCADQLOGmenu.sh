@@ -319,6 +319,9 @@ while ( test -z "$vOpcion" || true ) do
    vFileINCRET="SGCPINCMC${pEntAdq}.INCRET.${vFecProc}"
    vFileINCMATCH="SGCPINCMC${pEntAdq}.INCMATCH.${vFecProc}"
    vFileINCMAESTRO="SGCPINCMC${pEntAdq}.INCMAESTRO.${vFecProc}"
+   #NAIGUATA
+   vFileINCMAESTRO2="SGCPINCMC${pEntAdq}.INCMAESTRONGTA.${vFecProc}"
+   vFileREPDEBMAESTRO="SGCPINCMC${pEntAdq}.REPDEBMAESTRONGTA.${vFecProc}"
 
    f_menuCAB
    f_menuDAT
@@ -769,7 +772,7 @@ while ( test -z "$vOpcion" || true ) do
          fi
    fi # Opcion 6 - LOG de Reporte Credito MasterCard
   ################################################
-  # LOG DE INCOMING NAIGUATA MAESTRO - Opci�n 7
+  # LOG DE INCOMING NAIGUATA MAESTRO - Opción 7
   ################################################
    if [ "$vOpcion" = "7" ]; then
 
@@ -779,9 +782,9 @@ while ( test -z "$vOpcion" || true ) do
          then
             for vEntAdq in BM BP
             do
-              vFileINCMAESTRO="SGCPINCMC${vEntAdq}.INCMAESTRONGTA.${vFecProc}"
-              vFileLOG="${DIRLOG}/${vFileINCMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
-              vFileCTL="${DIRDAT}/${vFileINCMAESTRO}.CTL"
+              vFileINCMAESTRO2="SGCPINCMC${vEntAdq}.INCMAESTRONGTA.${vFecProc}"
+              vFileLOG="${DIRLOG}/${vFileINCMAESTRO2}"  #.`date '+%Y%m%d%H%M%S'`.LOG"
+              vFileCTL="${DIRDAT}/${vFileINCMAESTRO2}.CTL"
               if [ -f "${vFileCTL}" ]; then
                 vEstProc=`awk '{print substr($0,13,1)}' $vFileCTL`
                 case $vEstProc in
@@ -813,9 +816,9 @@ while ( test -z "$vOpcion" || true ) do
               fi
             done
          else
-            vFileINCMAESTRO="SGCPINCMC${vEntAdq}.INCMAESTRONGTA.${vFecProc}"
-            vFileLOG="${DIRLOG}/${vFileINCMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
-            vFileCTL="${DIRDAT}/${vFileINCMAESTRO}.CTL"
+            vFileINCMAESTRO2="SGCPINCMC${pEntAdq}.INCMAESTRONGTA.${vFecProc}"
+            vFileLOG="${DIRLOG}/${vFileINCMAESTRO2}"  #.`date '+%Y%m%d%H%M%S'`.LOG"
+            vFileCTL="${DIRDAT}/${vFileINCMAESTRO2}.CTL"
             if [ -f "${vFileCTL}" ]; then
               vEstProc=`awk '{print substr($0,13,1)}' $vFileCTL`
               case $vEstProc in
@@ -861,8 +864,8 @@ while ( test -z "$vOpcion" || true ) do
          then
             for vEntAdq in BM BP
             do
-              vFileINCREPDEBMAESTRO="SGCPINCMC${vEntAdq}.REPDEBMAESTRONGTA.${vFecProc}"
-              vFileLOG="${DIRLOG}/${vFileINCREPDEBMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
+              vFileREPDEBMAESTRO="SGCPINCMC${vEntAdq}.REPDEBMAESTRONGTA.${vFecProc}"
+              vFileLOG="${DIRLOG}/${vFileREPDEBMAESTRO}"  #.`date '+%Y%m%d%H%M%S'`.LOG"
               vFileLOG=`ls -tr ${vFileLOG}*.LOG 2>/dev/null | tail -1`
               if [ -z "$vFileLOG" ]
               then
@@ -877,8 +880,8 @@ while ( test -z "$vOpcion" || true ) do
               read vContinua
             done
          else
-            vFileINCREPDEBMAESTRO="SGCPINCMC${pEntAdq}.REPDEBMAESTRONGTA.${vFecProc}"
-            vFileLOG="${DIRLOG}/${vFileINCREPDEBMAESTRO}.`date '+%Y%m%d%H%M%S'`.LOG"
+            vFileREPDEBMAESTRO="SGCPINCMC${pEntAdq}.REPDEBMAESTRONGTA.${vFecProc}"
+            vFileLOG="${DIRLOG}/${vFileREPDEBMAESTRO}" #.`date '+%Y%m%d%H%M%S'`.LOG"
             vFileLOG=`ls -tr ${vFileLOG}*.LOG 2>/dev/null | tail -1`
             if [ -z "$vFileLOG" ]
             then
