@@ -569,7 +569,8 @@ while ( test -z "$vOpcion" || true ) do
                     echo "Analizando los datos el Archivo original de 1000 byte" >> $vFileLOG 2>&1
                     f_fhmsg "Analizando los datos el Archivo original de 1000 byte"
                     echo
-                    echo "Analisis archivo ${vARCHINC[$vADQIDX]} Si contiene datos para su procesamiento (Encabezado y Fin de Archivo)" >> $vFileLOG 2>&1
+                    echo "Analisis archivo ${vARCHINC[$vADQIDX]}" >> $vFileLOG 2>&1
+                    echo "Si contiene datos para su procesamiento (Encabezado y Fin de Archivo)" >> $vFileLOG 2>&1
                     f_fhmsg "Analisis archivo ${vARCHINC[$vADQIDX]} "
                     f_fhmsg "Validando: Encabezado y Fin de Archivo" 
                     echo
@@ -1572,12 +1573,12 @@ while ( test -z "$vOpcion" || true ) do
       f_fechora $vFecProc
       f_msg "    Fecha de Proceso: $vpValRet" N S
       f_msg
-      echo " Desea Continuar? (S=Si/N=No/<Enter>=No) => \c"
+      echo " Desea Continuar? (S=Si/N=No/<Enter>=No) => \E"
       read ValConf
       f_msg
-      echo "Ingresar Usuario Windows para Transferencia Disco R: \c"
+      echo "Ingresar Usuario Windows para Transferencia Disco R: \E"
       read USUARIOTMVE
-      echo "Ingresar Clave Windows para Transferencia Disco R: \c"
+      echo "Ingresar Clave Windows para Transferencia Disco R: \E"
       stty -echo
       read CLAVETMVE
       stty echo
@@ -1658,8 +1659,8 @@ while ( test -z "$vOpcion" || true ) do
                      then
                         f_msgtit I  
                         echo                                
-                        echo "Transferencia de archivos desde el servidor MQFTE de Naiguatá" >> $vFileLOG 2>&1
-                        f_fhmsg "Transferencia de archivos desde el servidor MQFTE de Naiguata"
+                        echo "Transferencia de T461NA desde el servidor MQFTE Naiguatá a PLATINO" >> $vFileLOG 2>&1
+                        f_fhmsg "Transferencia de T461NA desde el servidor MQFTE Naiguata a PLATINO"
                         echo
                         vARCHINC[$vADQIDX]=`sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} 2>/dev/null | grep -v sftp\>`
                         #vArchDest=`echo ${vARCHINC[$vADQIDX]} | cut -d. -f1`
@@ -1678,9 +1679,9 @@ while ( test -z "$vOpcion" || true ) do
                         else
                            #vArchDestB="${vpValRet_9}${vEndPoint}_${vFecJul}_01_conv"
                            echo
-                           f_fhmsg "Se envía archivo T464NA a platino2 (4200)" >> $vFileLOG 2>&1
-                           f_fhmsg "Se envía archivo T464NA a platino2 (4200)"
-                           vArchDestB="${vpValRet_10}${SWTIPO}NA_${vEndPoint}_0502_${vNomFile_SecA}_${vFecJul}_$vFecProc" ## Con la fecha de proceso IPR1302
+                           f_fhmsg "Se envía archivo T461NA a platino2 (4200)" >> $vFileLOG 2>&1
+                           f_fhmsg "Se envía archivo T461NA a platino2 (4200)"
+                           #vArchDestB="${vpValRet_10}${SWTIPO}NA_${vEndPoint}_0502_${vNomFile_SecA}_${vFecJul}"                   ## Con la fecha de proceso IPR1302
                            scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/$COD_AMBIENTEm/${vEntAdqm}/file_out  ##/$vArchDest
                            vSTATT=$?
                            if [ "$vSTATT" != "0" ]
@@ -1691,49 +1692,42 @@ while ( test -z "$vOpcion" || true ) do
                               sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
                            else
                               echo
-                              echo "Archivo ${vARCHINC[$vADQIDX]} Transferido Correctamente" >> $vFileLOG 2>&1
+                              echo "Archivo ${vARCHINC[$vADQIDX]} Transferido Correctamente al area de acceso de los Bancos" >> $vFileLOG 2>&1
                               f_fhmsg "Archivo ${vARCHINC[$vADQIDX]}" 
-                              f_fhmsg "Transferido Correctamente"
+                              f_fhmsg "Transferido Correctamente al area de acceso de los Bancos"
                               echo
-                              echo
-                              echo "Moviendo archivo ${vARCHINC[$vADQIDX]} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
-                              f_fhmsg "Moviendo archivo $vARCHINC "
-                              f_fhmsg "En  ${vPrefijo_Res} en Servidor MQFTE" 
-                              echo
-                              echo "rm ${vPrefijo_Res}/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
-                              sftp -b $DIRTMP/$dpNom$vFecProc.PARRM.SFTP ${SFTP_USER}@$SFTP_IMC_NGTA} >> $vFileLOG 2>&1
-                              echo
-                              echo "rename ${vPrefijo}/${vARCHINC[$vADQIDX]} ${vPrefijo_Res}/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-                              sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
-                              echo
-                              echo "Eliminando registro ${vARCHINC[$vADQIDX]} - en - ${vPrefijo} en Servidor MQFTE" >> $vFileLOG 2>&1
-                              f_fhmsg "Eliminando Archivo en servidor MQFTE de Naiguata"
-                              f_fhmsg "Eliminando registro ${vARCHINC[$vADQIDX]}"
-                              f_fhmsg "En - ${vPrefijo} en Servidor MQFTE" 
-                              echo
-                              
                               echo "Transfiriendo Archivo al disco R de GERENCIATST" >> $vFileLOG 2>&1
                               echo "Transfiriendo Archivo al disco R de GERENCIATST"
-                              vRUTAWIN1="$vPrefijoWin\\${vARCHINC[$vADQIDX]}"                                         ## $COD_AMBIENTE2   NUEVA VARIABLE DE AMBIENTE IPR1302
-                              vRUTAWIN2="\\Procesos\\Compensacion Naiguata-MC\\${COD_AMBIENTE2}\\T461NA\\$vArchDestB" ## $vpValRet_910\\$vArchDestB"
-                              vCOPIAWIN=`ssh ${SFTP_USER}@${SFTP_IMC_NGTA} cmd.exe /C "C:\\MFESFTP\\transtmve $vRUTAWIN1 $vPrefijoWin $vRUTAWIN2 $USUARIOTMVE $CLAVETMVE"`
+                              vRUTAWIN1="${vARCHINC[$vADQIDX]}"                                                 ## $COD_AMBIENTE2   NUEVA VARIABLE DE AMBIENTE IPR1302
+                              vRUTAWIN2="\\T461NA\\$vArchDest"                                                  ## $vpValRet_910\\$vArchDestB"
+                              vCOPIAWIN=`ssh ${SFTP_USER}@${SFTP_IMC_NGTA} cmd.exe /E "E:\\NAIGUATA\\transtmve_ngta $vRUTAWIN1 $COD_AMBIENTE $vRUTAWIN2 $USUARIOTMVE $CLAVETMVE"`
                               vSTATT=$?
                               if [ "$vSTATT" != "0" ]
                               then
                                  tput setf 8
-                                 echo "error en la transferencia del archivo $vArchDest del adquiriente $vEntAdq al Disco R de SRVCCSALC, favor revisar" | tee -a $vFileLOG
+                                 echo "error en la transferencia del archivo $vArchDest del adquiriente $vEntAdq al Disco R, favor revisar" | tee -a $vFileLOG
                                  echo $vCOPIAWIN | tee -a $vFileLOG
                                  tput setf 7
                                  sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
                               else
-                                 echo "Archivo ${vARCHINC[$vADQIDX]} transferido correctamente al Servidor SRVCCSALC (R)"
-                              fi
+                                 echo "Archivo ${vARCHINC[$vADQIDX]} transferido correctamente al Disco (R)"
+                              fi     
                            fi
-                           echo " "
-                           echo "Archivo ${vARCHINC[$vADQIDX]} Movido al Directorio Procesado(E)" | tee -a $vFileLOG
-                           #echo "rename $vPrefijo/$vEntAdq/T$vpValRet_9/${vARCHINC[$vADQIDX]} $vPrefijo/$vEntAdq/T$vpValRet_9/RESPALDO/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-                           #sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
-         #                    pg $DIRIN/$vArchDest
+                           echo
+                           echo "Moviendo archivo ${vARCHINC[$vADQIDX]}-${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
+                           f_fhmsg "Moviendo archivo ${vARCHINC[$vADQIDX]}"
+                           f_fhmsg "En  ${vPrefijo_Res} en Servidor MQFTE" 
+                           echo
+                           echo "rm ${vPrefijo_Res}/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
+                           sftp -b $DIRTMP/$dpNom$vFecProc.PARRM.SFTP ${SFTP_USER}@$SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                           echo
+                           echo "rename ${vPrefijo}/${vARCHINC[$vADQIDX]} ${vPrefijo_Res}/${vARCHINC[$vADQIDX]}" > $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                           sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                           echo
+                           echo "Eliminado registro ${vARCHINC[$vADQIDX]}- en -${vPrefijo} en Servidor MQFTE" >> $vFileLOG 2>&1
+                           f_fhmsg "Eliminado registro ${vARCHINC[$vADQIDX]}"
+                           f_fhmsg "En - ${vPrefijo} en Servidor MQFTE" 
+                           echo               
                         fi
                      fi
                      vADQIDX=`expr $vADQIDX + 1`
@@ -1794,8 +1788,8 @@ while ( test -z "$vOpcion" || true ) do
                then
                   f_msgtit I  
                   echo                                
-                  echo "Transferencia de archivos desde el servidor MQFTE de Naiguatá" >> $vFileLOG 2>&1
-                  f_fhmsg "Transferencia de archivos desde el servidor MQFTE de Naiguatá"
+                  echo "Transferencia de T461NA desde el servidor MQFTE Naiguatá a PLATINO" >> $vFileLOG 2>&1
+                  f_fhmsg "Transferencia de T461NA desde el servidor MQFTE Naiguatá a PLATINO"
                   echo
                   vARCHINC=`sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} 2>/dev/null | grep -v sftp\>`
                   #vArchDest=`echo ${vARCHINC} | cut -d. -f1`
@@ -1814,8 +1808,8 @@ while ( test -z "$vOpcion" || true ) do
                   else
                      ##vArchDestB="${vpValRet_9}${vEndPoint}_${vFecJul}_01_conv"
                      echo
-                     f_fhmsg "Se envía archivo T464NA a platino2 (4200)" >> $vFileLOG 2>&1
-                     f_fhmsg "Se envía archivo T464NA a platino2 (4200)"
+                     f_fhmsg "Se envía archivo T461NA a platino2 (4200)" >> $vFileLOG 2>&1
+                     f_fhmsg "Se envía archivo T461NA a platino2 (4200)"
                      vArchDestB="${vpValRet_10}${SWTIPO}NA_${vEndPoint}_0502_${vNomFile_SecA}_${vFecJul}_$vFecProc" ## Con la fecha de proceso IPR1302
                      scp -Bq $DIRIN/$vArchDest $SSSH_USER@$FTP_HOSTXCOM:/file_transfer/$COD_AMBIENTEm/${vEntAdqm}/file_out
                      vSTATT=$?
@@ -1827,45 +1821,44 @@ while ( test -z "$vOpcion" || true ) do
                         sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$pEntAdq"
                      else
                         echo
-                        echo "Archivo ${vARCHINC} Transferido Correctamente" >> $vFileLOG 2>&1
+                        echo "Archivo ${vARCHINC} Transferido Correctamente al area de acceso de los Bancos" >> $vFileLOG 2>&1
                         f_fhmsg "Archivo ${vARCHINC}" 
-                        f_fhmsg "Transferido Correctamente"
+                        f_fhmsg "Transferido Correctamente al area de acceso de los Bancos"
                         echo
                         echo
-                        echo "Moviendo archivo ${vARCHINC} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
-                        f_fhmsg "Moviendo archivo ${vARCHINC} "
-                        f_fhmsg "En  ${vPrefijo_Res} en Servidor MQFTE"  
-                        #scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
-                        echo
-                        echo "rm ${vPrefijo_Res}/${vARCHINC}" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
-                        sftp -b $DIRTMP/$dpNom$vFecProc.PARRM.SFTP ${SFTP_USER}@$SFTP_IMC_NGTA} >> $vFileLOG 2>&1
-                        echo
-                        echo "rename ${vPrefijo}/${vARCHINC} ${vPrefijo_Res}/${vARCHINC}" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
-                        sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
-                        echo
-                        echo "Eliminando registro ${vARCHINC} - en - ${vPrefijo} en Servidor MQFTE" >> $vFileLOG 2>&1
-                        f_fhmsg "Eliminando registro ${vARCHINC}"
-                        f_fhmsg "En - ${vPrefijo} en Servidor MQFTE" 
-                        echo
-                        echo "Archivo Transferido correctamente al area de acceso de los Bancos" >> $vFileLOG 2>&1
-                        echo "Archivo Transferido correctamente al area de acceso de los Bancos"
-                        echo
+                        echo "Transfiriendo Archivo al disco R de GERENCIATST" >> $vFileLOG 2>&1
                         echo "Transfiriendo Archivo al disco R de GERENCIATST"
-                        vRUTAWIN1="$vPrefijoWin\\${vARCHINC}"                                                   ## $COD_AMBIENTE2    IPR1302
-                        vRUTAWIN2="\\Procesos\\Compensacion Naiguata-MC\\${COD_AMBIENTE2}\\T461NA\\$vArchDestB" ## $vpValRet_910\\$vArchDestB"
-                        vCOPIAWIN=`ssh ${SFTP_USER}@${SFTP_IMC_NGTA} cmd.exe /C "C:\\MFESFTP\\transtmve $vRUTAWIN1 $vPrefijoWin $vRUTAWIN2 $USUARIOTMVE $CLAVETMVE"`
+                        vRUTAWIN1="${vARCHINC}"                                                 ## $COD_AMBIENTE2   NUEVA VARIABLE DE AMBIENTE IPR1302
+                        vRUTAWIN2="\\T461NA\\$vArchDest"                                                  ## $vpValRet_910\\$vArchDestB"
+                        vCOPIAWIN=`ssh ${SFTP_USER}@${SFTP_IMC_NGTA} cmd.exe /E "E:\\NAIGUATA\\transtmve_ngta $vRUTAWIN1 $COD_AMBIENTE $vRUTAWIN2 $USUARIOTMVE $CLAVETMVE"`
                         vSTATT=$?
                         if [ "$vSTATT" != "0" ]
-                           then
-                              tput setf 8
-                              echo "error en la transferencia del archivo $vArchDest del adquiriente $pEntAdq al Disco R de GERENCIATST, favor revisar" | tee -a $vFileLOG
-                              echo $vCOPIAWIN | tee -a $vFileLOG
-                              tput setf 7
-                              sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
-                           else
-                              echo "Archivo ${vARCHINC} transferido correctamente al Servidor GERENCIATST (R)"
-                        fi
+                        then
+                           tput setf 8
+                           echo "error en la transferencia del archivo $vArchDest del adquiriente $vEntAdq al Disco R, favor revisar" | tee -a $vFileLOG
+                           echo $vCOPIAWIN | tee -a $vFileLOG
+                           tput setf 7
+                           sqlplus -s $DB @$DIRBIN/alertacie INC MAESTRO-NGTA "Error_Transferencia_de_Archivo_$vArchDest_Adquiriente_$vEntAdq"
+                        else
+                           echo "Archivo ${vARCHINC} transferido correctamente al Disco (R)"
+                        fi                            
                      fi
+                     echo
+                     echo "Moviendo archivo ${vARCHINC} - ${vPrefijo_Res} en Servidor MQFTE" >> $vFileLOG 2>&1
+                     f_fhmsg "Moviendo archivo ${vARCHINC} "
+                     f_fhmsg "En  ${vPrefijo_Res} en Servidor MQFTE"  
+                     #scp -Bq $DIRIN/$vArchDest* ${SFTP_USER}@${SFTP_IMC_NGTA}:/${vPrefijo_Res}
+                     echo
+                     echo "rm ${vPrefijo_Res}/${vARCHINC}" > $DIRTMP/$dpNom$vFecProc.PARRM.SFTP
+                     sftp -b $DIRTMP/$dpNom$vFecProc.PARRM.SFTP ${SFTP_USER}@$SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                     echo
+                     echo "rename ${vPrefijo}/${vARCHINC} ${vPrefijo_Res}/${vARCHINC}" >> $DIRTMP/$dpNom$vFecProc.PAR.SFTP
+                     sftp -b $DIRTMP/$dpNom$vFecProc.PAR.SFTP ${SFTP_USER}@${SFTP_IMC_NGTA} >> $vFileLOG 2>&1
+                     echo
+                     echo "Eliminando registro ${vARCHINC} - en - ${vPrefijo} en Servidor MQFTE" >> $vFileLOG 2>&1
+                     f_fhmsg "Eliminando registro ${vARCHINC}"
+                     f_fhmsg "En - ${vPrefijo} en Servidor MQFTE" 
+                     echo
                      echo " "
                      echo "Archivo $vARCHINC Movido al Directorio Procesado(R)" | tee -a $vFileLOG
                      #vNumSec=`echo $vARCHINC | cut -d. -f3`
