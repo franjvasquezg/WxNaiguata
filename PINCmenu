@@ -34,7 +34,7 @@
 ## Datos del Programa
 ################################################################################
 
-dpNom="PINCmenu"           # Nombre del Programa
+dpNom="PINCmenu"              # Nombre del Programa
 dpDesc=""                     # Descripcion del Programa
 dpVer=5.00                    # Ultima Version del Programa
 dpFec="20200203"              # Fecha de Ultima Actualizacion [Formato:AAAAMMDD]
@@ -632,7 +632,7 @@ while ( test -z "$vOpcion" || true ) do
                vFlgOpcErr="N"
                vOpcion=""
                trap "trap '' 2" 2
-               SGCPINCMCADQmenu_ngta.sh TODOS ${vFecProc}
+               SGCPINCMCADQmenu_ngta.sh TODOS ${vFecProc} ${vFecSes}
                trap ""
             fi # Incoming MC - TODOS
 
@@ -640,7 +640,7 @@ while ( test -z "$vOpcion" || true ) do
                vFlgOpcErr="N"
                vOpcion=""
                trap "trap '' 2" 2
-               SGCPINCMCADQmenu_ngta.sh BM ${vFecProc}
+               SGCPINCMCADQmenu_ngta.sh BM ${vFecProc} ${vFecSes}
                trap ""
             fi # Incoming MC - MERCANTIL
 
@@ -648,7 +648,7 @@ while ( test -z "$vOpcion" || true ) do
                vFlgOpcErr="N"
                vOpcion=""
                trap "trap '' 2" 2
-               SGCPINCMCADQmenu_ngta.sh BP ${vFecProc}
+               SGCPINCMCADQmenu_ngta.sh BP ${vFecProc} ${vFecSes}
                trap ""
             fi # Incoming MC - PROVINCIAL
 
